@@ -1,6 +1,7 @@
 import React, { useState, createContext, useContext } from 'react';
-import { Upload, FolderOpen, Brain, BarChart3, Settings, Plus, FileText, Trash2, Check, X, Globe, Menu, Link as LinkIcon } from 'lucide-react';
+import { Upload, FolderOpen, Brain, BarChart3, Settings, Plus, FileText, Trash2, Check, X, Globe, Menu, Link as LinkIcon, Eye, Grid3x3, Network } from 'lucide-react';
 import { aiService } from './services/ai.service';
+import MindMap from './components/MindMap';
 
 const LanguageContext = createContext<{
   lang: string;
@@ -34,7 +35,16 @@ const translations = {
     analyzing1: 'Extraction des documents...',
     analyzing2: 'Analyse Gemini en cours...',
     analyzing3: 'Analyse Mistral en cours...',
-    analyzing4: 'Génération des memory cards...'
+    analyzing4: 'Génération des memory cards...',
+    viewMode: 'Mode d\'affichage',
+    fullMode: 'Complet',
+    semiMode: 'Résumé',
+    lightMode: 'Léger',
+    visualization: 'Visualisation',
+    treeView: 'Arbre',
+    webView: 'Toile',
+    memoryCards: 'Memory Cards',
+    backToMap: 'Retour à la carte'
   },
   en: {
     appName: 'StudyCards',
@@ -57,7 +67,16 @@ const translations = {
     analyzing1: 'Extracting documents...',
     analyzing2: 'Gemini analysis...',
     analyzing3: 'Mistral analysis...',
-    analyzing4: 'Generating cards...'
+    analyzing4: 'Generating cards...',
+    viewMode: 'Display mode',
+    fullMode: 'Full',
+    semiMode: 'Summary',
+    lightMode: 'Light',
+    visualization: 'Visualization',
+    treeView: 'Tree',
+    webView: 'Web',
+    memoryCards: 'Memory Cards',
+    backToMap: 'Back to map'
   }
 };
 
@@ -124,9 +143,7 @@ function genererMemoryCards(structure: any): MemoryCard[] {
   return cards;
 }
 
-// Fonction d'extraction de texte depuis PDF
 async function extraireTextePDF(fichier: File): Promise<string> {
-  // Utilisation de pdfjs-dist
   const pdfjsLib = await import('pdfjs-dist');
   pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
   
@@ -145,7 +162,6 @@ async function extraireTextePDF(fichier: File): Promise<string> {
   return texteComplet;
 }
 
-// Fonction d'extraction OCR depuis image
 async function extraireTexteImage(fichier: File): Promise<string> {
   const Tesseract = await import('tesseract.js');
   
@@ -160,13 +176,11 @@ async function extraireTexteImage(fichier: File): Promise<string> {
   return text;
 }
 
-// Fonction pour extraire texte d'une URL
 async function extraireTexteURL(url: string): Promise<string> {
   try {
     const response = await fetch(url);
     const html = await response.text();
     
-    // Extraction basique du texte (enlever les balises HTML)
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
     return doc.body.textContent || '';
@@ -319,7 +333,6 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
     setEtape(2);
     
     try {
-      // Étape 1: Extraction
       setEtapeAnalyse(1);
       const textesExtraits = await Promise.all(
         documents.map(async (doc) => {
@@ -336,11 +349,9 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
       
       const texteComplet = textesExtraits.join('\n\n');
       
-      // Étape 2: Analyse IA
       setEtapeAnalyse(2);
       const structure = await aiService.analyseDualIA(texteComplet);
       
-      // Étape 3: Génération cards
       setEtapeAnalyse(4);
       const cards = genererMemoryCards(structure);
       
@@ -360,7 +371,7 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
       setProjetActif(nouveauProjet);
       
       setTimeout(() => {
-        setActiveView('cards');
+        setActiveView('mindmap');
       }, 1000);
       
     } catch (error) {
@@ -492,14 +503,94 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
   );
 };
 
+const MindMapView = ({ projetActif, setActiveView }: any) => {
+  const { t } = useLanguage();
+  const [mode, setMode] = useState<'full' | 'semi' | 'light'>('semi');
+  const [visualisation, setVisualisation] = useState<'arbre' | 'toile'>(projetActif?.typeVisualisation || 'arbre');
+
+  return (
+    <div className="p-4 lg:p-8">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">{projetActif?.titre}</h2>
+        
+        <div className="flex flex-wrap gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('viewMode')}</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setMode('light')}
+                className={`px-4 py-2 rounded-lg text-sm ${mode === 'light' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}
+              >
+                {t('lightMode')}
+              </button>
+              <button
+                onClick={() => setMode('semi')}
+                className={`px-4 py-2 rounded-lg text-sm ${mode === 'semi' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}
+              >
+                {t('semiMode')}
+              </button>
+              <button
+                onClick={() => setMode('full')}
+                className={`px-4 py-2 rounded-lg text-sm ${mode === 'full' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}
+              >
+                {t('fullMode')}
+              </button>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('visualization')}</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setVisualisation('arbre')}
+                className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${visualisation === 'arbre' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}
+              >
+                <Grid3x3 size={16} />
+                {t('treeView')}
+              </button>
+              <button
+                onClick={() => setVisualisation('toile')}
+                className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${visualisation === 'toile' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}
+              >
+                <Network size={16} />
+                {t('webView')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-md p-4 mb-4">
+        <MindMap structure={projetActif?.structure} mode={mode} visualisation={visualisation} />
+      </div>
+
+      <div className="flex justify-between">
+        <button
+          onClick={() => setActiveView('projets')}
+          className="px-6 py-3 border rounded-lg"
+        >
+          {t('cancel')}
+        </button>
+        <button
+          onClick={() => setActiveView('cards')}
+          className="px-6 py-3 bg-green-600 text-white rounded-lg"
+        >
+          {t('memoryCards')}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const MemoryCards = ({ setActiveView, projetActif }: any) => {
+  const { t } = useLanguage();
   const cards = projetActif?.memoryCards || [];
   
   return (
     <div className="p-4 lg:p-8">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Memory Cards</h2>
-        <p className="text-gray-600">{cards.length} cartes générées</p>
+        <h2 className="text-2xl font-bold text-gray-800">{t('memoryCards')}</h2>
+        <p className="text-gray-600">{cards.length} {t('cards')}</p>
       </div>
 
       <div className="grid gap-4">
@@ -513,10 +604,10 @@ const MemoryCards = ({ setActiveView, projetActif }: any) => {
       </div>
 
       <button
-        onClick={() => setActiveView('projets')}
+        onClick={() => setActiveView('mindmap')}
         className="mt-6 px-6 py-3 border rounded-lg"
       >
-        Retour
+        {t('backToMap')}
       </button>
     </div>
   );
@@ -590,6 +681,7 @@ export default function App() {
           <div className="flex-1">
             {activeView === 'projets' && <AccueilProjets setActiveView={setActiveView} setProjetActif={setProjetActif} />}
             {activeView === 'nouveau' && <NouveauProjet setActiveView={setActiveView} setProjetActif={setProjetActif} />}
+            {activeView === 'mindmap' && <MindMapView projetActif={projetActif} setActiveView={setActiveView} />}
             {activeView === 'cards' && <MemoryCards setActiveView={setActiveView} projetActif={projetActif} />}
             {activeView === 'statistiques' && <Statistiques />}
             {activeView === 'parametres' && (
