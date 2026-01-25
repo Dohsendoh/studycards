@@ -1,5 +1,5 @@
 import React, { useState, createContext, useContext } from 'react';
-import { Upload, FolderOpen, Brain, BarChart3, Settings, Plus, FileText, Trash2, Check, X, Download, Globe, Menu } from 'lucide-react';
+import { Upload, FolderOpen, Brain, BarChart3, Settings, Plus, FileText, Trash2, Check, X, Globe, Menu, Link as LinkIcon } from 'lucide-react';
 import { aiService } from './services/ai.service';
 
 const LanguageContext = createContext<{
@@ -27,7 +27,14 @@ const translations = {
     launchAI: 'Lancer l\'analyse IA',
     analyzing: 'Analyse en cours...',
     cancel: 'Annuler',
-    language: 'Langue'
+    language: 'Langue',
+    uploadFiles: 'Uploader des fichiers',
+    addLink: 'Ajouter un lien',
+    projectName: 'Nom du projet',
+    analyzing1: 'Extraction des documents...',
+    analyzing2: 'Analyse Gemini en cours...',
+    analyzing3: 'Analyse Mistral en cours...',
+    analyzing4: 'Génération des memory cards...'
   },
   en: {
     appName: 'StudyCards',
@@ -43,7 +50,14 @@ const translations = {
     launchAI: 'Launch AI Analysis',
     analyzing: 'Analyzing...',
     cancel: 'Cancel',
-    language: 'Language'
+    language: 'Language',
+    uploadFiles: 'Upload files',
+    addLink: 'Add link',
+    projectName: 'Project name',
+    analyzing1: 'Extracting documents...',
+    analyzing2: 'Gemini analysis...',
+    analyzing3: 'Mistral analysis...',
+    analyzing4: 'Generating cards...'
   }
 };
 
@@ -65,8 +79,10 @@ interface Projet {
 interface Document {
   id: string;
   nom: string;
-  type: 'pdf' | 'word' | 'image' | 'photo';
-  taille: string;
+  type: 'pdf' | 'image' | 'link';
+  taille?: string;
+  fichier?: File;
+  url?: string;
 }
 
 interface MemoryCard {
@@ -108,7 +124,59 @@ function genererMemoryCards(structure: any): MemoryCard[] {
   return cards;
 }
 
-const Sidebar = ({ activeView, setActiveView, isOpen, setIsOpen }) => {
+// Fonction d'extraction de texte depuis PDF
+async function extraireTextePDF(fichier: File): Promise<string> {
+  // Utilisation de pdfjs-dist
+  const pdfjsLib = await import('pdfjs-dist');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+  
+  const arrayBuffer = await fichier.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  
+  let texteComplet = '';
+  
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map((item: any) => item.str).join(' ');
+    texteComplet += pageText + '\n\n';
+  }
+  
+  return texteComplet;
+}
+
+// Fonction d'extraction OCR depuis image
+async function extraireTexteImage(fichier: File): Promise<string> {
+  const Tesseract = await import('tesseract.js');
+  
+  const { data: { text } } = await Tesseract.recognize(
+    fichier,
+    'fra+eng',
+    {
+      logger: (m: any) => console.log('OCR:', m)
+    }
+  );
+  
+  return text;
+}
+
+// Fonction pour extraire texte d'une URL
+async function extraireTexteURL(url: string): Promise<string> {
+  try {
+    const response = await fetch(url);
+    const html = await response.text();
+    
+    // Extraction basique du texte (enlever les balises HTML)
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    return doc.body.textContent || '';
+  } catch (error) {
+    console.error('Erreur extraction URL:', error);
+    return `Contenu du lien : ${url}`;
+  }
+}
+
+const Sidebar = ({ activeView, setActiveView, isOpen, setIsOpen }: any) => {
   const { t } = useLanguage();
   const menuItems = [
     { id: 'projets', label: t('myProjects'), icon: FolderOpen },
@@ -172,9 +240,8 @@ const Sidebar = ({ activeView, setActiveView, isOpen, setIsOpen }) => {
   );
 };
 
-const AccueilProjets = ({ setActiveView, setProjetActif }) => {
+const AccueilProjets = ({ setActiveView, setProjetActif }: any) => {
   const { t } = useLanguage();
-  const [projets] = useState<Projet[]>([]);
 
   return (
     <div className="p-4 lg:p-8">
@@ -200,20 +267,43 @@ const AccueilProjets = ({ setActiveView, setProjetActif }) => {
   );
 };
 
-const NouveauProjet = ({ setActiveView, setProjetActif }) => {
+const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
   const { t } = useLanguage();
   const [etape, setEtape] = useState(1);
+  const [etapeAnalyse, setEtapeAnalyse] = useState(1);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [nomProjet, setNomProjet] = useState('');
+  const [lienURL, setLienURL] = useState('');
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const ajouterDocument = () => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    Array.from(files).forEach(file => {
+      const type = file.type.includes('pdf') ? 'pdf' : 'image';
+      const nouveauDoc: Document = {
+        id: Date.now().toString() + Math.random(),
+        nom: file.name,
+        type,
+        taille: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        fichier: file
+      };
+      setDocuments(prev => [...prev, nouveauDoc]);
+    });
+  };
+
+  const ajouterLien = () => {
+    if (!lienURL) return;
+    
     const nouveauDoc: Document = {
       id: Date.now().toString(),
-      nom: `Document_test_${documents.length + 1}.txt`,
-      type: 'pdf',
-      taille: '2.4 MB'
+      nom: lienURL,
+      type: 'link',
+      url: lienURL
     };
-    setDocuments([...documents, nouveauDoc]);
+    setDocuments(prev => [...prev, nouveauDoc]);
+    setLienURL('');
   };
 
   const supprimerDocument = (id: string) => {
@@ -229,26 +319,35 @@ const NouveauProjet = ({ setActiveView, setProjetActif }) => {
     setEtape(2);
     
     try {
-      const texteTest = `
-      Contenu éducatif sur ${nomProjet}
+      // Étape 1: Extraction
+      setEtapeAnalyse(1);
+      const textesExtraits = await Promise.all(
+        documents.map(async (doc) => {
+          if (doc.type === 'pdf' && doc.fichier) {
+            return await extraireTextePDF(doc.fichier);
+          } else if (doc.type === 'image' && doc.fichier) {
+            return await extraireTexteImage(doc.fichier);
+          } else if (doc.type === 'link' && doc.url) {
+            return await extraireTexteURL(doc.url);
+          }
+          return '';
+        })
+      );
       
-      Introduction:
-      Ceci est une introduction au sujet principal.
+      const texteComplet = textesExtraits.join('\n\n');
       
-      Chapitre 1: Concepts de base
-      Les concepts fondamentaux sont essentiels.
+      // Étape 2: Analyse IA
+      setEtapeAnalyse(2);
+      const structure = await aiService.analyseDualIA(texteComplet);
       
-      Chapitre 2: Concepts avancés
-      Les notions avancées approfondissent le sujet.
-      `;
-      
-      const structure = await aiService.analyseDualIA(texteTest);
+      // Étape 3: Génération cards
+      setEtapeAnalyse(4);
       const cards = genererMemoryCards(structure);
       
       const nouveauProjet: Projet = {
         id: Date.now().toString(),
         titre: nomProjet,
-        dossier: 'Test',
+        dossier: 'Mes projets',
         typeVisualisation: 'arbre',
         dateCreation: new Date(),
         nombreCards: cards.length,
@@ -284,29 +383,60 @@ const NouveauProjet = ({ setActiveView, setProjetActif }) => {
               type="text"
               value={nomProjet}
               onChange={(e) => setNomProjet(e.target.value)}
-              placeholder="Nom du projet"
+              placeholder={t('projectName')}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
             />
             
-            <div
-              onClick={ajouterDocument}
-              className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-indigo-400"
-            >
-              <Upload className="w-10 h-10 mx-auto mb-2 text-gray-400" />
-              <p>Ajouter un document</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,image/*"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-indigo-400 flex flex-col items-center"
+              >
+                <Upload className="w-8 h-8 mb-2 text-gray-400" />
+                <span className="text-sm">{t('uploadFiles')}</span>
+              </button>
+              
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                <LinkIcon className="w-8 h-8 mb-2 text-gray-400 mx-auto" />
+                <input
+                  type="url"
+                  value={lienURL}
+                  onChange={(e) => setLienURL(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full text-sm px-2 py-1 border rounded mb-2"
+                />
+                <button
+                  onClick={ajouterLien}
+                  className="w-full text-sm bg-indigo-600 text-white py-1 rounded"
+                >
+                  {t('addLink')}
+                </button>
+              </div>
             </div>
 
             {documents.length > 0 && (
-              <div className="space-y-2 mt-4">
+              <div className="space-y-2">
                 {documents.map(doc => (
                   <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <FileText className="text-red-500" />
-                      <span>{doc.nom}</span>
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {doc.type === 'link' ? <LinkIcon className="text-blue-500 flex-shrink-0" size={20} /> : <FileText className="text-red-500 flex-shrink-0" size={20} />}
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-sm truncate">{doc.nom}</div>
+                        {doc.taille && <div className="text-xs text-gray-500">{doc.taille}</div>}
+                      </div>
                     </div>
                     <button
                       onClick={() => supprimerDocument(doc.id)}
-                      className="text-red-500 p-2"
+                      className="text-red-500 p-2 flex-shrink-0"
                     >
                       <Trash2 size={18} />
                     </button>
@@ -325,7 +455,8 @@ const NouveauProjet = ({ setActiveView, setProjetActif }) => {
             </button>
             <button
               onClick={lancerAnalyse}
-              className="px-6 py-3 bg-indigo-600 text-white rounded-lg flex items-center gap-2"
+              disabled={!nomProjet || documents.length === 0}
+              className="px-6 py-3 bg-indigo-600 text-white rounded-lg flex items-center gap-2 disabled:bg-gray-300"
             >
               <Brain size={20} />
               {t('launchAI')}
@@ -340,14 +471,28 @@ const NouveauProjet = ({ setActiveView, setProjetActif }) => {
             <Brain className="w-10 h-10 text-indigo-600" />
           </div>
           <h3 className="text-2xl font-bold mb-3">{t('analyzing')}</h3>
-          <p className="text-gray-600">Gemini + Mistral analysent...</p>
+          
+          <div className="space-y-3 max-w-md mx-auto text-left">
+            {[1, 2, 3, 4].map(num => (
+              <div key={num} className="flex items-center gap-3">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                  etapeAnalyse > num ? 'bg-green-500' : etapeAnalyse === num ? 'bg-indigo-500 animate-spin' : 'border-2 border-gray-300'
+                }`}>
+                  {etapeAnalyse > num && <Check size={16} className="text-white" />}
+                </div>
+                <span className={etapeAnalyse >= num ? 'font-medium' : 'text-gray-500'}>
+                  {t(`analyzing${num}` as any)}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
   );
 };
 
-const MemoryCards = ({ setActiveView, projetActif }) => {
+const MemoryCards = ({ setActiveView, projetActif }: any) => {
   const cards = projetActif?.memoryCards || [];
   
   return (
@@ -358,7 +503,7 @@ const MemoryCards = ({ setActiveView, projetActif }) => {
       </div>
 
       <div className="grid gap-4">
-        {cards.map((card) => (
+        {cards.map((card: any) => (
           <div key={card.id} className="bg-white rounded-xl shadow-md p-6">
             <div className="text-sm text-indigo-600 mb-1">{card.theme}</div>
             <div className="font-bold text-lg mb-2">{card.question}</div>
@@ -392,7 +537,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [lang, setLang] = useState('fr');
 
-  const t = (key: string) => translations[lang]?.[key] || key;
+  const t = (key: string) => (translations as any)[lang]?.[key] || key;
 
   const langContext = { lang, setLang, t };
 
