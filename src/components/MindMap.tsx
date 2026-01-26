@@ -78,7 +78,8 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
       noeud: any,
       parentId: string | null = null,
       niveau: number = 0,
-      position: { x: number; y: number } = { x: 0, y: 0 }
+      position: { x: number; y: number } = { x: 0, y: 0 },
+      angleFromParent?: number // Nouvel argument pour tracer les connexions
     ) {
       const currentId = `node-${nodeId++}`;
       
@@ -143,35 +144,26 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
         },
       });
       
-      if (parentId) {
-        // Déterminer les handles source/target selon la visualisation
+      if (parentId && typeof angleFromParent !== 'undefined') {
+        // Déterminer les handles source/target selon l'angle en mode Toile
         let sourceHandle = undefined;
         let targetHandle = undefined;
         
         if (visualisation === 'toile' && niveau > 0) {
-          // En mode toile, calculer l'angle pour déterminer les handles
-          const childCount = noeud.enfants?.length || 0;
-          const angle = (index / childCount) * 2 * Math.PI - Math.PI / 2;
-          
           // Déterminer le handle source (d'où part la connexion du parent)
-          if (angle >= -Math.PI / 4 && angle < Math.PI / 4) {
+          if (angleFromParent >= -Math.PI / 4 && angleFromParent < Math.PI / 4) {
             sourceHandle = 'right'; // Droite
-          } else if (angle >= Math.PI / 4 && angle < 3 * Math.PI / 4) {
+            targetHandle = 'left';
+          } else if (angleFromParent >= Math.PI / 4 && angleFromParent < 3 * Math.PI / 4) {
             sourceHandle = 'bottom'; // Bas
-          } else if (angle >= 3 * Math.PI / 4 || angle < -3 * Math.PI / 4) {
+            targetHandle = 'top';
+          } else if (angleFromParent >= 3 * Math.PI / 4 || angleFromParent < -3 * Math.PI / 4) {
             sourceHandle = 'left'; // Gauche
+            targetHandle = 'right';
           } else {
             sourceHandle = 'top'; // Haut
+            targetHandle = 'bottom';
           }
-          
-          // Le handle target est l'opposé
-          const oppositeHandles = {
-            'right': 'left',
-            'bottom': 'top',
-            'left': 'right',
-            'top': 'bottom'
-          };
-          targetHandle = oppositeHandles[sourceHandle];
         }
         
         edges.push({
@@ -194,6 +186,7 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
         
         noeud.enfants.forEach((enfant: any, index: number) => {
           let childX, childY;
+          let childAngle = 0;
           
           if (visualisation === 'arbre') {
             // Disposition en arbre vertical
@@ -202,14 +195,13 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
             childY = position.y + 180;
           } else {
             // Disposition en toile (radiale)
-            // Le nœud central est au centre
-            const angle = (index / childCount) * 2 * Math.PI - Math.PI / 2;
+            childAngle = (index / childCount) * 2 * Math.PI - Math.PI / 2;
             const radius = 280 + niveau * 40;
-            childX = position.x + Math.cos(angle) * radius;
-            childY = position.y + Math.sin(angle) * radius;
+            childX = position.x + Math.cos(childAngle) * radius;
+            childY = position.y + Math.sin(childAngle) * radius;
           }
           
-          convertToNodes(enfant, currentId, niveau + 1, { x: childX, y: childY });
+          convertToNodes(enfant, currentId, niveau + 1, { x: childX, y: childY }, childAngle);
         });
       }
     }
@@ -259,3 +251,4 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
 };
 
 export default MindMap;
+                                                               
