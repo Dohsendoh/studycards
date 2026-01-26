@@ -1,5 +1,5 @@
 import React, { useState, createContext, useContext } from 'react';
-import { Upload, FolderOpen, Brain, BarChart3, Settings, Plus, FileText, Trash2, Check, X, Globe, Menu, Link as LinkIcon, Eye, Grid3x3, Network } from 'lucide-react';
+import { Upload, FolderOpen, Brain, BarChart3, Settings, Plus, FileText, Trash2, Check, X, Globe, Menu, Link as LinkIcon, Eye, Grid, Network } from 'lucide-react';
 import { aiService } from './services/ai.service';
 import MindMap from './components/MindMap';
 
