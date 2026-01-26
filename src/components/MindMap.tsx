@@ -144,10 +144,42 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
       });
       
       if (parentId) {
+        // Déterminer les handles source/target selon la visualisation
+        let sourceHandle = undefined;
+        let targetHandle = undefined;
+        
+        if (visualisation === 'toile' && niveau > 0) {
+          // En mode toile, calculer l'angle pour déterminer les handles
+          const childCount = noeud.enfants?.length || 0;
+          const angle = (index / childCount) * 2 * Math.PI - Math.PI / 2;
+          
+          // Déterminer le handle source (d'où part la connexion du parent)
+          if (angle >= -Math.PI / 4 && angle < Math.PI / 4) {
+            sourceHandle = 'right'; // Droite
+          } else if (angle >= Math.PI / 4 && angle < 3 * Math.PI / 4) {
+            sourceHandle = 'bottom'; // Bas
+          } else if (angle >= 3 * Math.PI / 4 || angle < -3 * Math.PI / 4) {
+            sourceHandle = 'left'; // Gauche
+          } else {
+            sourceHandle = 'top'; // Haut
+          }
+          
+          // Le handle target est l'opposé
+          const oppositeHandles = {
+            'right': 'left',
+            'bottom': 'top',
+            'left': 'right',
+            'top': 'bottom'
+          };
+          targetHandle = oppositeHandles[sourceHandle];
+        }
+        
         edges.push({
           id: `edge-${parentId}-${currentId}`,
           source: parentId,
           target: currentId,
+          sourceHandle,
+          targetHandle,
           type: 'smoothstep',
           animated: false,
           style: { 
@@ -226,4 +258,4 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
   );
 };
 
-export default MindMap
+export default MindMap;
