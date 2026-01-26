@@ -70,7 +70,7 @@ ${texte.substring(0, 20000)}`;
       console.log('🤖 Gemini...');
       
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -187,7 +187,7 @@ ${texte.substring(0, 20000)}`;
       console.log('🤖 Mistral...');
       
       const response = await fetch(
-        'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2',
+        'https://api-inference.huggingface.co/models/mistralai/Mistral-Nemo-Instruct-2407',
         {
           method: 'POST',
           headers: {
