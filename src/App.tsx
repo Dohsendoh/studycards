@@ -371,8 +371,9 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
       setProjetActif(nouveauProjet);
       
       setTimeout(() => {
-        setActiveView('mindmap');
-      }, 1000);
+  setActiveView('mindmap');  // ✅ BON
+}, 1000);
+
       
     } catch (error) {
       console.error('❌ Erreur:', error);
