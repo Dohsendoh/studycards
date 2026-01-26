@@ -360,7 +360,7 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
         id: Date.now().toString(),
         titre: nomProjet,
         dossier: 'Mes projets',
-        typeVisualisation: 'arbre',
+        typeVisualisation: 'typeVisualisation',
         dateCreation: new Date(),
         nombreCards: cards.length,
         progression: 0,
