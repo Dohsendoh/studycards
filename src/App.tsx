@@ -399,6 +399,39 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
               placeholder={t('projectName')}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
             />
+
+            
+{/* Choix de la visualisation */}
+<div className="mb-4">
+  <label className="block text-sm font-medium text-gray-700 mb-2">
+    {t('visualization')}
+  </label>
+  <div className="flex gap-2">
+    <button
+      onClick={() => setTypeVisualisation('arbre')}
+      className={`flex-1 px-4 py-3 rounded-lg text-sm flex items-center justify-center gap-2 border-2 ${
+        typeVisualisation === 'arbre' 
+          ? 'bg-indigo-600 text-white border-indigo-600' 
+          : 'bg-white text-gray-700 border-gray-300'
+      }`}
+    >
+      <Grid size={20} />
+      <span>{t('treeView')}</span>
+    </button>
+    <button
+      onClick={() => setTypeVisualisation('toile')}
+      className={`flex-1 px-4 py-3 rounded-lg text-sm flex items-center justify-center gap-2 border-2 ${
+        typeVisualisation === 'toile' 
+          ? 'bg-indigo-600 text-white border-indigo-600' 
+          : 'bg-white text-gray-700 border-gray-300'
+      }`}
+    >
+      <Network size={20} />
+      <span>{t('webView')}</span>
+    </button>
+  </div>
+</div>
+
             
             <input
               ref={fileInputRef}
