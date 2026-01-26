@@ -17,6 +17,50 @@ interface MindMapProps {
   visualisation: 'arbre' | 'toile';
 }
 
+// Fonction pour générer un dégradé de couleur
+const getColorByLevel = (niveau: number, baseColor: string = '#6366f1'): string => {
+  const colors = {
+    '#6366f1': [ // Indigo (par défaut)
+      '#6366f1', // Niveau 0 - Indigo foncé
+      '#818cf8', // Niveau 1 - Indigo moyen
+      '#a5b4fc', // Niveau 2 - Indigo clair
+      '#c7d2fe', // Niveau 3 - Indigo très clair
+      '#e0e7ff'  // Niveau 4 - Indigo ultra clair
+    ],
+    '#ef4444': [ // Rouge
+      '#ef4444',
+      '#f87171',
+      '#fca5a5',
+      '#fecaca',
+      '#fee2e2'
+    ],
+    '#10b981': [ // Vert
+      '#10b981',
+      '#34d399',
+      '#6ee7b7',
+      '#a7f3d0',
+      '#d1fae5'
+    ],
+    '#f59e0b': [ // Orange
+      '#f59e0b',
+      '#fbbf24',
+      '#fcd34d',
+      '#fde68a',
+      '#fef3c7'
+    ],
+    '#8b5cf6': [ // Violet
+      '#8b5cf6',
+      '#a78bfa',
+      '#c4b5fd',
+      '#ddd6fe',
+      '#ede9fe'
+    ],
+  };
+
+  const colorArray = colors[baseColor] || colors['#6366f1'];
+  return colorArray[Math.min(niveau, colorArray.length - 1)];
+};
+
 const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => {
   
   // Conversion de la structure en nœuds React Flow
@@ -27,6 +71,9 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
     const edges: Edge[] = [];
     let nodeId = 0;
     
+    // Couleur de base (peut être modifiée plus tard)
+    const baseColor = '#6366f1';
+    
     function convertToNodes(
       noeud: any,
       parentId: string | null = null,
@@ -35,15 +82,21 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
     ) {
       const currentId = `node-${nodeId++}`;
       
-      // Contenu selon le mode
-      let label = '';
+      // Déterminer le contenu selon le mode
+      let contentToShow = '';
       if (mode === 'light') {
-        label = noeud.titre;
+        // Mode léger : seulement le titre
+        contentToShow = '';
       } else if (mode === 'semi') {
-        label = `${noeud.titre}\n${noeud.contenu?.substring(0, 50)}...`;
+        // Mode semi : titre + début du contenu
+        contentToShow = noeud.contenu?.substring(0, 80) + '...' || '';
       } else {
-        label = `${noeud.titre}\n\n${noeud.contenu || ''}`;
+        // Mode full : tout le contenu
+        contentToShow = noeud.contenu || '';
       }
+      
+      // Largeur selon le mode
+      const nodeWidth = mode === 'light' ? 150 : mode === 'semi' ? 250 : 350;
       
       nodes.push({
         id: currentId,
@@ -51,32 +104,42 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
         position,
         data: {
           label: (
-            <div style={{
-              padding: '10px',
-              minWidth: mode === 'light' ? '120px' : mode === 'semi' ? '200px' : '300px',
-              maxWidth: '400px',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
+            <div 
+              style={{
+                padding: '12px',
+                width: `${nodeWidth}px`,
+                textAlign: 'center',
+                overflow: 'hidden',
+                wordWrap: 'break-word'
+              }}
+            >
+              <div style={{ 
+                fontWeight: 'bold', 
+                marginBottom: contentToShow ? '8px' : '0',
+                fontSize: niveau === 0 ? '16px' : '14px'
+              }}>
                 {noeud.titre}
               </div>
-              {mode !== 'light' && (
-                <div style={{ fontSize: '12px', color: '#666' }}>
-                  {mode === 'semi' 
-                    ? noeud.contenu?.substring(0, 60) + '...'
-                    : noeud.contenu
-                  }
+              {contentToShow && (
+                <div style={{ 
+                  fontSize: '12px', 
+                  color: niveau === 0 ? '#e0e7ff' : '#4b5563',
+                  lineHeight: '1.4'
+                }}>
+                  {contentToShow}
                 </div>
               )}
             </div>
           ),
         },
         style: {
-          background: niveau === 0 ? '#6366f1' : '#e0e7ff',
+          background: getColorByLevel(niveau, baseColor),
           color: niveau === 0 ? 'white' : '#1f2937',
-          border: '2px solid #6366f1',
-          borderRadius: '10px',
-          fontSize: mode === 'light' ? '14px' : '12px',
+          border: `2px solid ${baseColor}`,
+          borderRadius: '12px',
+          fontSize: '13px',
+          boxShadow: niveau === 0 ? '0 4px 6px rgba(0,0,0,0.1)' : '0 2px 4px rgba(0,0,0,0.05)',
+          width: `${nodeWidth}px`,
         },
       });
       
@@ -87,25 +150,29 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
           target: currentId,
           type: 'smoothstep',
           animated: false,
-          style: { stroke: '#6366f1', strokeWidth: 2 },
+          style: { 
+            stroke: getColorByLevel(niveau - 1, baseColor), 
+            strokeWidth: 2 
+          },
         });
       }
       
       if (noeud.enfants && noeud.enfants.length > 0) {
         const childCount = noeud.enfants.length;
-        const spacing = visualisation === 'arbre' ? 250 : 300;
         
         noeud.enfants.forEach((enfant: any, index: number) => {
           let childX, childY;
           
           if (visualisation === 'arbre') {
             // Disposition en arbre vertical
-            childX = position.x + (index - childCount / 2) * spacing;
-            childY = position.y + 200;
+            const spacing = nodeWidth + 80;
+            childX = position.x + (index - (childCount - 1) / 2) * spacing;
+            childY = position.y + 180;
           } else {
             // Disposition en toile (radiale)
-            const angle = (index / childCount) * 2 * Math.PI;
-            const radius = 250 + niveau * 50;
+            // Le nœud central est au centre
+            const angle = (index / childCount) * 2 * Math.PI - Math.PI / 2;
+            const radius = 280 + niveau * 40;
             childX = position.x + Math.cos(angle) * radius;
             childY = position.y + Math.sin(angle) * radius;
           }
@@ -115,8 +182,9 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
       }
     }
     
-    const startX = visualisation === 'arbre' ? 400 : 500;
-    const startY = visualisation === 'arbre' ? 50 : 300;
+    // Position de départ
+    const startX = visualisation === 'arbre' ? 400 : 600;
+    const startY = visualisation === 'arbre' ? 50 : 400;
     
     convertToNodes(structure, null, 0, { x: startX, y: startY });
     
@@ -126,8 +194,14 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   
+  // Mettre à jour les nœuds quand les props changent
+  React.useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
+  
   return (
-    <div style={{ width: '100%', height: '600px' }}>
+    <div style={{ width: '100%', height: '600px', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -135,13 +209,21 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
         onEdgesChange={onEdgesChange}
         fitView
         attributionPosition="bottom-left"
+        minZoom={0.2}
+        maxZoom={2}
       >
-        <Background />
+        <Background color="#f3f4f6" gap={16} />
         <Controls />
-        <MiniMap />
+        <MiniMap 
+          nodeColor={(node) => {
+            const bgColor = node.style?.background as string;
+            return bgColor || '#6366f1';
+          }}
+          maskColor="rgba(0, 0, 0, 0.1)"
+        />
       </ReactFlow>
     </div>
   );
 };
 
-export default MindMap;
+export default MindMap
