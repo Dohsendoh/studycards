@@ -288,6 +288,7 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [nomProjet, setNomProjet] = useState('');
   const [lienURL, setLienURL] = useState('');
+  const [typeVisualisation, setTypeVisualisation] = useState<'arbre' | 'toile'>('arbre');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
