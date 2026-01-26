@@ -546,7 +546,7 @@ const MindMapView = ({ projetActif, setActiveView }: any) => {
                 onClick={() => setVisualisation('arbre')}
                 className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${visualisation === 'arbre' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}
               >
-                <Grid3x3 size={16} />
+                <Grid size={16} />
                 {t('treeView')}
               </button>
               <button
