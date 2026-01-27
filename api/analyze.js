@@ -91,12 +91,12 @@ STRICT JSON FORMAT:
 }
 
 STRICT RULES:
-1. RESPOND IN THE SAME LANGUAGE AS THE INPUT TEXT
+1. RESPOND IN THE SAME LANGUAGE AS THE INPUT TEXT IMAGES LINK OR ANY DOCUMENT
 2. First child MUST be "Introduction" (or equivalent in the document's language)
 3. Extract ALL important concepts and details from the document
 4. NO LIMIT on hierarchy depth - add as many levels as needed
 5. NO "Synthesis", "Summary", "Conclusion" nodes
-6. Content: 50-150 characters per node
+6. Content: 50-250 characters per node
 7. Return ONLY valid JSON, no backticks, no text before/after
 
 TEXT TO ANALYZE:
