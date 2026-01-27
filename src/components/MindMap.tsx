@@ -40,13 +40,11 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
     const edges: Edge[] = [];
     let nodeId = 0;
     
-    // Cases plus étroites
     const nodeWidth = mode === 'light' ? 140 : mode === 'semi' ? 180 : 240;
     const nodeHeight = mode === 'light' ? 70 : mode === 'semi' ? 100 : 130;
     
-    // Espacements AUGMENTÉS pour éviter superposition
-    const horizontalGap = 120;  // Augmenté de 70 à 120
-    const verticalGap = 250;    // Augmenté de 230 à 250
+    const horizontalGap = 120;
+    const verticalGap = 250;
     
     function createNode(noeud: any, x: number, y: number, niveau: number): string {
       const currentId = `node-${nodeId++}`;
@@ -70,7 +68,6 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
         id: currentId,
         type: 'default',
         position: { x, y },
-        // FORCER les points de connexion : BAS pour source, HAUT pour target
         sourcePosition: Position.Bottom,
         targetPosition: Position.Top,
         data: {
@@ -129,7 +126,7 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
           height: `${nodeHeight}px`,
           padding: 0,
         },
-        draggable: true, // Réactiver le drag
+        draggable: true,
       });
       
       return currentId;
@@ -147,10 +144,14 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
       return Math.max(nodeWidth, totalChildWidth + gaps);
     }
     
-    function buildTree(noeud: any, parentId: string | null, niveau: number, centerX: number, startY: number, forceY?: number): void {
-      const currentY = forceY !== undefined ? forceY : startY + (niveau * verticalGap);
+    function buildTree(
+      noeud: any, 
+      parentId: string | null, 
+      niveau: number, 
+      centerX: number, 
+      currentY: number
+    ): void {
       const currentX = centerX - (nodeWidth / 2);
-      
       const currentId = createNode(noeud, currentX, currentY, niveau);
       
       if (parentId) {
@@ -158,7 +159,7 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
           id: `edge-${parentId}-${currentId}`,
           source: parentId,
           target: currentId,
-          type: 'straight', // Ligne droite au lieu de smoothstep
+          type: 'straight',
           animated: false,
           style: { 
             stroke: getColorByLevel(niveau - 1), 
@@ -168,23 +169,22 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
       }
       
       if (noeud.enfants && noeud.enfants.length > 0) {
-        // LOGIQUE SPÉCIALE POUR LE NIVEAU 0 (Thème principal)
+        // NIVEAU 0 : Thème principal
         if (niveau === 0) {
-          // Chercher l'introduction
           const introIndex = noeud.enfants.findIndex((child: any) => 
             child.titre?.toLowerCase().includes('introduction')
           );
           
           if (introIndex !== -1) {
-            // L'introduction existe
+            // Introduction existe
             const introduction = noeud.enfants[introIndex];
             const autresEnfants = noeud.enfants.filter((_: any, i: number) => i !== introIndex);
             
-            // Placer l'introduction SEULE au niveau 1
+            // 1. Placer Introduction (niveau 1)
             const introY = currentY + verticalGap;
-            buildTree(introduction, currentId, niveau + 1, centerX, startY, introY);
+            const introId = buildTreeAndReturnId(introduction, currentId, 1, centerX, introY);
             
-            // Placer les AUTRES enfants (axes principaux) au niveau 2
+            // 2. Placer les Axes principaux (niveau 2) - RELIÉS À L'INTRODUCTION
             if (autresEnfants.length > 0) {
               const axesY = introY + verticalGap;
               const childrenWidths = autresEnfants.map((child: any) => calculateTreeWidth(child));
@@ -197,52 +197,96 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
               autresEnfants.forEach((child: any, index: number) => {
                 const childWidth = childrenWidths[index];
                 const childCenterX = currentChildX + (childWidth / 2);
-                buildTree(child, currentId, niveau + 1, childCenterX, startY, axesY);
+                
+                // Relier à l'Introduction (pas au thème)
+                buildTree(child, introId, 2, childCenterX, axesY);
+                
                 currentChildX += childWidth + horizontalGap;
               });
             }
           } else {
-            // Pas d'introduction, comportement normal
+            // Pas d'introduction
+            const childY = currentY + verticalGap;
             const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child));
             const totalWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
             const totalGaps = (noeud.enfants.length - 1) * horizontalGap;
             const totalTreeWidth = totalWidth + totalGaps;
             
             let currentChildX = centerX - (totalTreeWidth / 2);
-            const childY = currentY + verticalGap;
             
             noeud.enfants.forEach((child: any, index: number) => {
               const childWidth = childrenWidths[index];
               const childCenterX = currentChildX + (childWidth / 2);
-              buildTree(child, currentId, niveau + 1, childCenterX, startY, childY);
+              buildTree(child, currentId, niveau + 1, childCenterX, childY);
               currentChildX += childWidth + horizontalGap;
             });
           }
         } else {
-          // Comportement normal pour les autres niveaux
+          // AUTRES NIVEAUX : Hiérarchie verticale stricte
+          const childY = currentY + verticalGap;
           const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child));
           const totalWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
           const totalGaps = (noeud.enfants.length - 1) * horizontalGap;
           const totalTreeWidth = totalWidth + totalGaps;
           
           let currentChildX = centerX - (totalTreeWidth / 2);
-          const childY = currentY + verticalGap;
           
           noeud.enfants.forEach((child: any, index: number) => {
             const childWidth = childrenWidths[index];
             const childCenterX = currentChildX + (childWidth / 2);
             
-            // Forcer Y pour les enfants directs d'Introduction (niveau 2)
-            if (niveau === 1) {
-              buildTree(child, currentId, niveau + 1, childCenterX, startY, childY);
-            } else {
-              buildTree(child, currentId, niveau + 1, childCenterX, startY);
-            }
+            // Chaque enfant EN DESSOUS de son parent
+            buildTree(child, currentId, niveau + 1, childCenterX, childY);
             
             currentChildX += childWidth + horizontalGap;
           });
         }
       }
+    }
+    
+    // Fonction auxiliaire pour créer un nœud et retourner son ID
+    function buildTreeAndReturnId(
+      noeud: any, 
+      parentId: string | null, 
+      niveau: number, 
+      centerX: number, 
+      currentY: number
+    ): string {
+      const currentX = centerX - (nodeWidth / 2);
+      const currentId = createNode(noeud, currentX, currentY, niveau);
+      
+      if (parentId) {
+        edges.push({
+          id: `edge-${parentId}-${currentId}`,
+          source: parentId,
+          target: currentId,
+          type: 'straight',
+          animated: false,
+          style: { 
+            stroke: getColorByLevel(niveau - 1), 
+            strokeWidth: 2 
+          },
+        });
+      }
+      
+      if (noeud.enfants && noeud.enfants.length > 0) {
+        const childY = currentY + verticalGap;
+        const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child));
+        const totalWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
+        const totalGaps = (noeud.enfants.length - 1) * horizontalGap;
+        const totalTreeWidth = totalWidth + totalGaps;
+        
+        let currentChildX = centerX - (totalTreeWidth / 2);
+        
+        noeud.enfants.forEach((child: any, index: number) => {
+          const childWidth = childrenWidths[index];
+          const childCenterX = currentChildX + (childWidth / 2);
+          buildTree(child, currentId, niveau + 1, childCenterX, childY);
+          currentChildX += childWidth + horizontalGap;
+        });
+      }
+      
+      return currentId;
     }
     
     function buildWeb(noeud: any, parentId: string | null, niveau: number, centerX: number, centerY: number, startAngle: number): void {
