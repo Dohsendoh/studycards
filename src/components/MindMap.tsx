@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -8,6 +8,7 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   Position,
+  NodeChange,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -18,11 +19,12 @@ interface MindMapProps {
 }
 
 const COLOR_THEMES = {
-  indigo: ['#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff'],
-  purple: ['#9333ea', '#a855f7', '#c084fc', '#d8b4fe', '#e9d5ff'],
-  blue: ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'],
-  green: ['#059669', '#10b981', '#34d399', '#6ee7b7', '#a7f3d0'],
-  orange: ['#ea580c', '#f97316', '#fb923c', '#fdba74', '#fed7aa'],
+  // Dégradés plus doux avec 7 niveaux
+  indigo: ['#6366f1', '#7c87f5', '#96a0f9', '#a5b4fc', '#bac4fd', '#c7d2fe', '#dce3ff'],
+  purple: ['#9333ea', '#a04eee', '#ae68f1', '#c084fc', '#cd9dfd', '#d8b4fe', '#e5cbff'],
+  blue: ['#2563eb', '#3b7aef', '#5291f3', '#60a5fa', '#7db8fb', '#93c5fd', '#b0d5fe'],
+  green: ['#059669', '#10a576', '#1eb383', '#34d399', '#52dca8', '#6ee7b7', '#8aedc6'],
+  orange: ['#ea580c', '#ed6d23', '#f0823a', '#fb923c', '#fca455', '#fdba74', '#fec993'],
 };
 
 const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => {
@@ -33,6 +35,39 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
     return colors[Math.min(niveau, colors.length - 1)];
   };
   
+  // Fonction pour calculer la taille selon le niveau
+  const getSizeByLevel = (niveau: number, mode: string) => {
+    const sizes = {
+      light: [
+        { width: 180, height: 80 },   // Niveau 0 - Titre
+        { width: 160, height: 75 },   // Niveau 1 - Intro
+        { width: 140, height: 70 },   // Niveau 2 - Axes
+        { width: 120, height: 65 },   // Niveau 3
+        { width: 100, height: 60 },   // Niveau 4
+        { width: 90, height: 55 },    // Niveau 5+
+      ],
+      semi: [
+        { width: 260, height: 120 },  // Niveau 0
+        { width: 220, height: 110 },  // Niveau 1
+        { width: 180, height: 100 },  // Niveau 2
+        { width: 150, height: 90 },   // Niveau 3
+        { width: 130, height: 85 },   // Niveau 4
+        { width: 110, height: 80 },   // Niveau 5+
+      ],
+      full: [
+        { width: 320, height: 150 },  // Niveau 0
+        { width: 280, height: 140 },  // Niveau 1
+        { width: 240, height: 130 },  // Niveau 2
+        { width: 200, height: 120 },  // Niveau 3
+        { width: 170, height: 110 },  // Niveau 4
+        { width: 150, height: 100 },  // Niveau 5+
+      ],
+    };
+    
+    const sizeArray = sizes[mode as keyof typeof sizes];
+    return sizeArray[Math.min(niveau, sizeArray.length - 1)];
+  };
+  
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     if (!structure) return { nodes: [], edges: [] };
     
@@ -40,29 +75,38 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
     const edges: Edge[] = [];
     let nodeId = 0;
     
-    const nodeWidth = mode === 'light' ? 140 : mode === 'semi' ? 180 : 240;
-    const nodeHeight = mode === 'light' ? 70 : mode === 'semi' ? 100 : 130;
+    // Espacement familial : réduit pour les niveaux profonds
+    const getHorizontalGap = (niveau: number) => {
+      if (niveau <= 1) return 120;      // Thème et intro
+      if (niveau === 2) return 100;     // Axes principaux
+      if (niveau === 3) return 70;      // Premier niveau de détails
+      return 50;                        // Sous-détails (famille rapprochée)
+    };
     
-    const horizontalGap = 120;
     const verticalGap = 250;
     
     function createNode(noeud: any, x: number, y: number, niveau: number): string {
       const currentId = `node-${nodeId++}`;
+      const { width: nodeWidth, height: nodeHeight } = getSizeByLevel(niveau, mode);
       
       let contentToShow = '';
       let maxChars = 0;
       
       if (mode === 'semi') {
-        maxChars = 100;
+        maxChars = niveau === 0 ? 120 : niveau === 1 ? 100 : 80;
         contentToShow = noeud.contenu?.substring(0, maxChars) || '';
       } else if (mode === 'full') {
-        maxChars = 180;
+        maxChars = niveau === 0 ? 200 : niveau === 1 ? 180 : niveau === 2 ? 150 : 120;
         contentToShow = noeud.contenu?.substring(0, maxChars) || '';
       }
       
       if (contentToShow && noeud.contenu?.length > maxChars) {
         contentToShow += '...';
       }
+      
+      // Taille de police décroissante
+      const titleSize = niveau === 0 ? '15px' : niveau === 1 ? '13px' : niveau === 2 ? '12px' : '11px';
+      const contentSize = niveau === 0 ? '11px' : niveau === 1 ? '10px' : '9px';
       
       nodes.push({
         id: currentId,
@@ -79,12 +123,12 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              padding: '8px',
+              padding: niveau === 0 ? '12px' : niveau === 1 ? '10px' : '8px',
               boxSizing: 'border-box',
             }}>
               <div style={{ 
-                fontWeight: 'bold',
-                fontSize: niveau === 0 ? '14px' : '12px',
+                fontWeight: niveau <= 2 ? 'bold' : '600',
+                fontSize: titleSize,
                 marginBottom: contentToShow ? '4px' : '0',
                 width: '100%',
                 textAlign: 'center',
@@ -98,7 +142,7 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
               </div>
               {contentToShow && (
                 <div style={{ 
-                  fontSize: '10px',
+                  fontSize: contentSize,
                   color: niveau === 0 ? '#e0e7ff' : '#4b5563',
                   lineHeight: '1.2',
                   width: '100%',
@@ -114,14 +158,19 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
             </div>
           ),
           niveau: niveau,
+          originalPosition: { x, y }, // Sauvegarder position originale
         },
         style: {
           background: getColorByLevel(niveau),
           color: niveau === 0 ? 'white' : '#1f2937',
           border: `2px solid ${COLOR_THEMES[colorTheme][0]}`,
-          borderRadius: '8px',
+          borderRadius: niveau === 0 ? '10px' : niveau === 1 ? '9px' : '8px',
           fontSize: '12px',
-          boxShadow: niveau === 0 ? '0 4px 8px rgba(0,0,0,0.15)' : '0 2px 4px rgba(0,0,0,0.08)',
+          boxShadow: niveau === 0 
+            ? '0 4px 8px rgba(0,0,0,0.15)' 
+            : niveau === 1 
+              ? '0 3px 6px rgba(0,0,0,0.1)'
+              : '0 2px 4px rgba(0,0,0,0.08)',
           width: `${nodeWidth}px`,
           height: `${nodeHeight}px`,
           padding: 0,
@@ -132,16 +181,19 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
       return currentId;
     }
     
-    function calculateTreeWidth(noeud: any): number {
+    function calculateTreeWidth(noeud: any, niveau: number): number {
+      const { width } = getSizeByLevel(niveau, mode);
+      
       if (!noeud.enfants || noeud.enfants.length === 0) {
-        return nodeWidth;
+        return width;
       }
       
-      const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child));
+      const horizontalGap = getHorizontalGap(niveau);
+      const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child, niveau + 1));
       const totalChildWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
       const gaps = (noeud.enfants.length - 1) * horizontalGap;
       
-      return Math.max(nodeWidth, totalChildWidth + gaps);
+      return Math.max(width, totalChildWidth + gaps);
     }
     
     function buildTree(
@@ -151,6 +203,7 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
       centerX: number, 
       currentY: number
     ): void {
+      const { width: nodeWidth } = getSizeByLevel(niveau, mode);
       const currentX = centerX - (nodeWidth / 2);
       const currentId = createNode(noeud, currentX, currentY, niveau);
       
@@ -169,25 +222,22 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
       }
       
       if (noeud.enfants && noeud.enfants.length > 0) {
-        // NIVEAU 0 : Thème principal
         if (niveau === 0) {
           const introIndex = noeud.enfants.findIndex((child: any) => 
             child.titre?.toLowerCase().includes('introduction')
           );
           
           if (introIndex !== -1) {
-            // Introduction existe
             const introduction = noeud.enfants[introIndex];
             const autresEnfants = noeud.enfants.filter((_: any, i: number) => i !== introIndex);
             
-            // 1. Placer Introduction (niveau 1)
             const introY = currentY + verticalGap;
             const introId = buildTreeAndReturnId(introduction, currentId, 1, centerX, introY);
             
-            // 2. Placer les Axes principaux (niveau 2) - RELIÉS À L'INTRODUCTION
             if (autresEnfants.length > 0) {
               const axesY = introY + verticalGap;
-              const childrenWidths = autresEnfants.map((child: any) => calculateTreeWidth(child));
+              const horizontalGap = getHorizontalGap(1);
+              const childrenWidths = autresEnfants.map((child: any) => calculateTreeWidth(child, 2));
               const totalWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
               const totalGaps = (autresEnfants.length - 1) * horizontalGap;
               const totalTreeWidth = totalWidth + totalGaps;
@@ -197,17 +247,14 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
               autresEnfants.forEach((child: any, index: number) => {
                 const childWidth = childrenWidths[index];
                 const childCenterX = currentChildX + (childWidth / 2);
-                
-                // Relier à l'Introduction (pas au thème)
                 buildTree(child, introId, 2, childCenterX, axesY);
-                
                 currentChildX += childWidth + horizontalGap;
               });
             }
           } else {
-            // Pas d'introduction
             const childY = currentY + verticalGap;
-            const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child));
+            const horizontalGap = getHorizontalGap(niveau);
+            const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child, niveau + 1));
             const totalWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
             const totalGaps = (noeud.enfants.length - 1) * horizontalGap;
             const totalTreeWidth = totalWidth + totalGaps;
@@ -222,9 +269,9 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
             });
           }
         } else {
-          // AUTRES NIVEAUX : Hiérarchie verticale stricte
           const childY = currentY + verticalGap;
-          const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child));
+          const horizontalGap = getHorizontalGap(niveau);
+          const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child, niveau + 1));
           const totalWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
           const totalGaps = (noeud.enfants.length - 1) * horizontalGap;
           const totalTreeWidth = totalWidth + totalGaps;
@@ -234,17 +281,13 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
           noeud.enfants.forEach((child: any, index: number) => {
             const childWidth = childrenWidths[index];
             const childCenterX = currentChildX + (childWidth / 2);
-            
-            // Chaque enfant EN DESSOUS de son parent
             buildTree(child, currentId, niveau + 1, childCenterX, childY);
-            
             currentChildX += childWidth + horizontalGap;
           });
         }
       }
     }
     
-    // Fonction auxiliaire pour créer un nœud et retourner son ID
     function buildTreeAndReturnId(
       noeud: any, 
       parentId: string | null, 
@@ -252,6 +295,7 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
       centerX: number, 
       currentY: number
     ): string {
+      const { width: nodeWidth } = getSizeByLevel(niveau, mode);
       const currentX = centerX - (nodeWidth / 2);
       const currentId = createNode(noeud, currentX, currentY, niveau);
       
@@ -271,7 +315,8 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
       
       if (noeud.enfants && noeud.enfants.length > 0) {
         const childY = currentY + verticalGap;
-        const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child));
+        const horizontalGap = getHorizontalGap(niveau);
+        const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child, niveau + 1));
         const totalWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
         const totalGaps = (noeud.enfants.length - 1) * horizontalGap;
         const totalTreeWidth = totalWidth + totalGaps;
@@ -290,6 +335,7 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
     }
     
     function buildWeb(noeud: any, parentId: string | null, niveau: number, centerX: number, centerY: number, startAngle: number): void {
+      const { width: nodeWidth, height: nodeHeight } = getSizeByLevel(niveau, mode);
       const radius = 250 + (niveau * 80);
       
       if (niveau === 0) {
@@ -332,7 +378,7 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
     }
     
     if (visualisation === 'arbre') {
-      const treeWidth = calculateTreeWidth(structure);
+      const treeWidth = calculateTreeWidth(structure, 0);
       const startX = Math.max(800, treeWidth / 2 + 200);
       buildTree(structure, null, 0, startX, 50);
     } else {
@@ -345,10 +391,35 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   
+  // Sauvegarder les positions modifiées
+  const [customPositions, setCustomPositions] = useState<Map<string, {x: number, y: number}>>(new Map());
+  
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    // Sauvegarder les nouvelles positions
+    changes.forEach((change) => {
+      if (change.type === 'position' && change.position && change.dragging === false) {
+        setCustomPositions(prev => {
+          const newMap = new Map(prev);
+          newMap.set(change.id, change.position!);
+          return newMap;
+        });
+      }
+    });
+    onNodesChange(changes);
+  }, [onNodesChange]);
+  
   React.useEffect(() => {
-    setNodes(initialNodes);
+    // Appliquer les positions custom lors du changement de couleur
+    const updatedNodes = initialNodes.map(node => {
+      const customPos = customPositions.get(node.id);
+      if (customPos) {
+        return { ...node, position: customPos };
+      }
+      return node;
+    });
+    setNodes(updatedNodes);
     setEdges(initialEdges);
-  }, [initialNodes, initialEdges, setNodes, setEdges]);
+  }, [initialNodes, initialEdges, setNodes, setEdges, customPositions]);
   
   return (
     <div style={{ position: 'relative' }}>
@@ -385,7 +456,7 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
+          onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           fitView
           fitViewOptions={{ padding: 0.2, maxZoom: 1.5 }}
