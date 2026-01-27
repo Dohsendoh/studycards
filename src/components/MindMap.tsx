@@ -26,10 +26,22 @@ const COLOR_THEMES = {
 
 const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => {
   const [colorTheme, setColorTheme] = useState<keyof typeof COLOR_THEMES>('indigo');
+  const [customColor, setCustomColor] = useState('#6366f1');
+  const [useCustomColor, setUseCustomColor] = useState(false);
   
   const getColorByLevel = (niveau: number): string => {
+    if (useCustomColor) {
+      // Générer des nuances à partir de la couleur custom
+      const baseColor = customColor;
+      const opacity = [1, 0.85, 0.7, 0.55, 0.4][Math.min(niveau, 4)];
+      return baseColor + Math.round(opacity * 255).toString(16).padStart(2, '0');
+    }
     const colors = COLOR_THEMES[colorTheme];
     return colors[Math.min(niveau, colors.length - 1)];
+  };
+  
+  const getBorderColor = (): string => {
+    return useCustomColor ? customColor : COLOR_THEMES[colorTheme][0];
   };
   
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
@@ -39,30 +51,29 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
     const edges: Edge[] = [];
     let nodeId = 0;
     
-    // Largeur selon le mode
-    const nodeWidth = mode === 'light' ? 180 : mode === 'semi' ? 240 : 320;
-    const nodeHeight = mode === 'light' ? 70 : mode === 'semi' ? 110 : 140;
+    // Largeur réduite
+    const nodeWidth = mode === 'light' ? 160 : mode === 'semi' ? 200 : 280;
+    const nodeHeight = mode === 'light' ? 80 : mode === 'semi' ? 120 : 150;
     
-    // Espacements réduits
-    const horizontalGap = 150; // Réduit de 200 à 150
-    const verticalGap = 160;   // Espace vertical entre niveaux
+    // Espacements ajustés
+    const horizontalGap = 100;  // Réduit de 150 à 100
+    const verticalGap = 220;    // Augmenté de 160 à 220
     
     // Créer un nœud
-    function createNode(noeud: any, x: number, y: number, niveau: number): string {
+    function createNode(noeud: any, x: number, y: number, niveau: number, isIntroduction: boolean = false): string {
       const currentId = `node-${nodeId++}`;
       
       let contentToShow = '';
       let maxChars = 0;
       
       if (mode === 'semi') {
-        maxChars = 120;
+        maxChars = 100;
         contentToShow = noeud.contenu?.substring(0, maxChars) || '';
       } else if (mode === 'full') {
-        maxChars = 250;
+        maxChars = 200;
         contentToShow = noeud.contenu?.substring(0, maxChars) || '';
       }
       
-      // Ajouter "..." si tronqué
       if (contentToShow && noeud.contenu?.length > maxChars) {
         contentToShow += '...';
       }
@@ -74,24 +85,22 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
         data: {
           label: (
             <div style={{
-              padding: '10px',
               width: `${nodeWidth}px`,
               height: `${nodeHeight}px`,
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              textAlign: 'center',
-              overflow: 'hidden',
+              padding: '12px',
+              boxSizing: 'border-box'
             }}>
               <div style={{ 
                 fontWeight: 'bold',
                 fontSize: niveau === 0 ? '15px' : '13px',
-                marginBottom: contentToShow ? '6px' : '0',
+                marginBottom: contentToShow ? '8px' : '0',
+                textAlign: 'center',
                 width: '100%',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
+                lineHeight: '1.2'
               }}>
                 {noeud.titre}
               </div>
@@ -100,12 +109,12 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
                   fontSize: '11px',
                   color: niveau === 0 ? '#e0e7ff' : '#4b5563',
                   lineHeight: '1.3',
+                  textAlign: 'center',
                   width: '100%',
                   overflow: 'hidden',
                   display: '-webkit-box',
-                  WebkitLineClamp: mode === 'semi' ? 3 : 5,
-                  WebkitBoxOrient: 'vertical',
-                  textOverflow: 'ellipsis'
+                  WebkitLineClamp: mode === 'semi' ? 3 : 4,
+                  WebkitBoxOrient: 'vertical'
                 }}>
                   {contentToShow}
                 </div>
@@ -116,19 +125,20 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
         style: {
           background: getColorByLevel(niveau),
           color: niveau === 0 ? 'white' : '#1f2937',
-          border: `2px solid ${COLOR_THEMES[colorTheme][0]}`,
+          border: `2px solid ${getBorderColor()}`,
           borderRadius: '10px',
           fontSize: '13px',
           boxShadow: niveau === 0 ? '0 4px 8px rgba(0,0,0,0.15)' : '0 2px 4px rgba(0,0,0,0.08)',
           width: `${nodeWidth}px`,
           height: `${nodeHeight}px`,
+          padding: 0,
         },
+        draggable: !isIntroduction && niveau !== 2, // Bloquer déplacement vertical niveau 2
       });
       
       return currentId;
     }
     
-    // Calculer la largeur totale d'un sous-arbre
     function calculateTreeWidth(noeud: any): number {
       if (!noeud.enfants || noeud.enfants.length === 0) {
         return nodeWidth;
@@ -141,13 +151,14 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
       return Math.max(nodeWidth, totalChildWidth + gaps);
     }
     
-    // Construire l'arbre
     function buildTree(noeud: any, parentId: string | null, niveau: number, centerX: number, startY: number, forceY?: number): void {
-      // Utiliser forceY si spécifié (pour garder les nœuds du même niveau alignés)
       const currentY = forceY !== undefined ? forceY : startY + (niveau * verticalGap);
       const currentX = centerX - (nodeWidth / 2);
       
-      const currentId = createNode(noeud, currentX, currentY, niveau);
+      // Vérifier si c'est l'introduction
+      const isIntroduction = niveau === 1 && noeud.titre?.toLowerCase().includes('introduction');
+      
+      const currentId = createNode(noeud, currentX, currentY, niveau, isIntroduction);
       
       if (parentId) {
         edges.push({
@@ -161,34 +172,64 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
       }
       
       if (noeud.enfants && noeud.enfants.length > 0) {
-        const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child));
-        const totalWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
-        const totalGaps = (noeud.enfants.length - 1) * horizontalGap;
-        const totalTreeWidth = totalWidth + totalGaps;
+        // Séparer l'introduction des autres enfants
+        const introduction = noeud.enfants.find((child: any) => 
+          child.titre?.toLowerCase().includes('introduction')
+        );
+        const autresEnfants = noeud.enfants.filter((child: any) => 
+          !child.titre?.toLowerCase().includes('introduction')
+        );
         
-        let currentChildX = centerX - (totalTreeWidth / 2);
-        
-        // Pour les enfants de niveau 1 (axes principaux), forcer la même ligne Y
-        const childY = currentY + verticalGap;
-        
-        noeud.enfants.forEach((child: any, index: number) => {
-          const childWidth = childrenWidths[index];
-          const childCenterX = currentChildX + (childWidth / 2);
+        // Traiter l'introduction seule si elle existe
+        if (introduction && niveau === 0) {
+          const introY = currentY + verticalGap;
+          buildTree(introduction, currentId, niveau + 1, centerX, startY, introY);
           
-          // Si on est au niveau 0 ou 1, forcer l'alignement Y des enfants
-          if (niveau === 0 || niveau === 1) {
-            buildTree(child, currentId, niveau + 1, childCenterX, startY, childY);
-          } else {
-            buildTree(child, currentId, niveau + 1, childCenterX, startY);
+          // Traiter les autres enfants après l'introduction
+          if (autresEnfants.length > 0) {
+            const autresY = introY + verticalGap;
+            const childrenWidths = autresEnfants.map((child: any) => calculateTreeWidth(child));
+            const totalWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
+            const totalGaps = (autresEnfants.length - 1) * horizontalGap;
+            const totalTreeWidth = totalWidth + totalGaps;
+            
+            let currentChildX = centerX - (totalTreeWidth / 2);
+            
+            autresEnfants.forEach((child: any, index: number) => {
+              const childWidth = childrenWidths[index];
+              const childCenterX = currentChildX + (childWidth / 2);
+              buildTree(child, currentId, niveau + 1, childCenterX, startY, autresY);
+              currentChildX += childWidth + horizontalGap;
+            });
           }
+        } else {
+          // Traitement normal pour les autres niveaux
+          const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child));
+          const totalWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
+          const totalGaps = (noeud.enfants.length - 1) * horizontalGap;
+          const totalTreeWidth = totalWidth + totalGaps;
           
-          currentChildX += childWidth + horizontalGap;
-        });
+          let currentChildX = centerX - (totalTreeWidth / 2);
+          const childY = currentY + verticalGap;
+          
+          noeud.enfants.forEach((child: any, index: number) => {
+            const childWidth = childrenWidths[index];
+            const childCenterX = currentChildX + (childWidth / 2);
+            
+            // Forcer Y pour niveau 2 (axes principaux)
+            if (niveau === 1) {
+              buildTree(child, currentId, niveau + 1, childCenterX, startY, childY);
+            } else {
+              buildTree(child, currentId, niveau + 1, childCenterX, startY);
+            }
+            
+            currentChildX += childWidth + horizontalGap;
+          });
+        }
       }
     }
     
-    // Construire en mode toile
-    function buildWeb(noeud: any, parentId: string | null, niveau: number, centerX: number, centerY: number, startAngle: number, angleSpan: number): void {
+    function buildWeb(noeud: any, parentId: string | null, niveau: number, centerX: number, centerY: number, startAngle: number): void {
       const radius = 250 + (niveau * 80);
       
       if (niveau === 0) {
@@ -199,7 +240,7 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
           
           noeud.enfants.forEach((child: any, index: number) => {
             const angle = index * angleStep - Math.PI / 2;
-            buildWeb(child, currentId, niveau + 1, centerX, centerY, angle, angleStep);
+            buildWeb(child, currentId, niveau + 1, centerX, centerY, angle);
           });
         }
       } else {
@@ -220,11 +261,9 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
         }
         
         if (noeud.enfants && noeud.enfants.length > 0) {
-          const childAngleSpan = angleSpan / noeud.enfants.length;
-          
           noeud.enfants.forEach((child: any, index: number) => {
-            const childAngle = startAngle + (index * childAngleSpan) - (angleSpan / 2) + (childAngleSpan / 2);
-            buildWeb(child, currentId, niveau + 1, centerX, centerY, childAngle, childAngleSpan);
+            const childAngle = startAngle + ((index - (noeud.enfants.length - 1) / 2) * 0.3);
+            buildWeb(child, currentId, niveau + 1, centerX, centerY, childAngle);
           });
         }
       }
@@ -235,11 +274,11 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
       const startX = Math.max(800, treeWidth / 2 + 200);
       buildTree(structure, null, 0, startX, 50);
     } else {
-      buildWeb(structure, null, 0, 600, 400, 0, 2 * Math.PI);
+      buildWeb(structure, null, 0, 600, 400, 0);
     }
     
     return { nodes, edges };
-  }, [structure, mode, visualisation, colorTheme]);
+  }, [structure, mode, visualisation, colorTheme, customColor, useCustomColor]);
   
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -251,7 +290,6 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
   
   return (
     <div style={{ position: 'relative' }}>
-      {/* Bouton changement de couleur */}
       <div style={{ 
         position: 'absolute', 
         top: '10px', 
@@ -267,12 +305,15 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
         {Object.keys(COLOR_THEMES).map((theme) => (
           <button
             key={theme}
-            onClick={() => setColorTheme(theme as keyof typeof COLOR_THEMES)}
+            onClick={() => {
+              setColorTheme(theme as keyof typeof COLOR_THEMES);
+              setUseCustomColor(false);
+            }}
             style={{
               width: '32px',
               height: '32px',
               borderRadius: '6px',
-              border: colorTheme === theme ? '3px solid #1f2937' : '2px solid #e5e7eb',
+              border: !useCustomColor && colorTheme === theme ? '3px solid #1f2937' : '2px solid #e5e7eb',
               background: COLOR_THEMES[theme as keyof typeof COLOR_THEMES][0],
               cursor: 'pointer',
               transition: 'all 0.2s'
@@ -280,6 +321,26 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
             title={theme.charAt(0).toUpperCase() + theme.slice(1)}
           />
         ))}
+        
+        <div style={{ position: 'relative' }}>
+          <input
+            type="color"
+            value={customColor}
+            onChange={(e) => {
+              setCustomColor(e.target.value);
+              setUseCustomColor(true);
+            }}
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '6px',
+              border: useCustomColor ? '3px solid #1f2937' : '2px solid #e5e7eb',
+              cursor: 'pointer',
+              background: 'linear-gradient(45deg, #ff0000 0%, #ff7f00 16.67%, #ffff00 33.33%, #00ff00 50%, #0000ff 66.67%, #4b0082 83.33%, #9400d3 100%)'
+            }}
+            title="Couleur personnalisée"
+          />
+        </div>
       </div>
       
       <div style={{ width: '100%', height: '650px', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
