@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -7,7 +7,6 @@ import ReactFlow, {
   MiniMap,
   useNodesState,
   useEdgesState,
-  Position,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -20,41 +19,13 @@ interface MindMapProps {
 // Fonction pour générer un dégradé de couleur
 const getColorByLevel = (niveau: number, baseColor: string = '#6366f1'): string => {
   const colors = {
-    '#6366f1': [ // Indigo (par défaut)
+    '#6366f1': [
       '#6366f1', // Niveau 0 - Indigo foncé
-      '#818cf8', // Niveau 1 - Indigo moyen
-      '#a5b4fc', // Niveau 2 - Indigo clair
-      '#c7d2fe', // Niveau 3 - Indigo très clair
-      '#e0e7ff'  // Niveau 4 - Indigo ultra clair
-    ],
-    '#ef4444': [ // Rouge
-      '#ef4444',
-      '#f87171',
-      '#fca5a5',
-      '#fecaca',
-      '#fee2e2'
-    ],
-    '#10b981': [ // Vert
-      '#10b981',
-      '#34d399',
-      '#6ee7b7',
-      '#a7f3d0',
-      '#d1fae5'
-    ],
-    '#f59e0b': [ // Orange
-      '#f59e0b',
-      '#fbbf24',
-      '#fcd34d',
-      '#fde68a',
-      '#fef3c7'
-    ],
-    '#8b5cf6': [ // Violet
-      '#8b5cf6',
-      '#a78bfa',
-      '#c4b5fd',
-      '#ddd6fe',
-      '#ede9fe'
-    ],
+      '#818cf8', // Niveau 1
+      '#a5b4fc', // Niveau 2
+      '#c7d2fe', // Niveau 3
+      '#e0e7ff'  // Niveau 4+
+    ]
   };
 
   const colorArray = colors[baseColor] || colors['#6366f1'];
@@ -63,46 +34,77 @@ const getColorByLevel = (niveau: number, baseColor: string = '#6366f1'): string 
 
 const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => {
   
-  // Conversion de la structure en nœuds React Flow
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     if (!structure) return { nodes: [], edges: [] };
     
     const nodes: Node[] = [];
     const edges: Edge[] = [];
     let nodeId = 0;
-    
-    // Couleur de base (peut être modifiée plus tard)
     const baseColor = '#6366f1';
     
+    // Calculer la largeur d'une case selon le mode
+    const getNodeWidth = (mode: string): number => {
+      switch (mode) {
+        case 'light': return 180;
+        case 'semi': return 280;
+        case 'full': return 380;
+        default: return 280;
+      }
+    };
+    
+    const nodeWidth = getNodeWidth(mode);
+    const horizontalSpacing = nodeWidth + 120; // Espacement horizontal entre les cases
+    const verticalSpacing = 200; // Espacement vertical entre les niveaux
+    
+    // Fonction récursive pour calculer le nombre de feuilles (pour l'espacement)
+    function countLeaves(noeud: any): number {
+      if (!noeud.enfants || noeud.enfants.length === 0) return 1;
+      return noeud.enfants.reduce((sum: number, child: any) => sum + countLeaves(child), 0);
+    }
+    
+    // Fonction pour convertir la structure en nœuds
     function convertToNodes(
       noeud: any,
       parentId: string | null = null,
       niveau: number = 0,
-      position: { x: number; y: number } = { x: 0, y: 0 },
-      angleFromParent?: number // Nouvel argument pour tracer les connexions
-    ) {
+      xOffset: number = 0,
+      parentX: number = 0
+    ): number {
       const currentId = `node-${nodeId++}`;
       
-      // Déterminer le contenu selon le mode
+      // Contenu selon le mode
       let contentToShow = '';
       if (mode === 'light') {
-        // Mode léger : seulement le titre
         contentToShow = '';
       } else if (mode === 'semi') {
-        // Mode semi : titre + début du contenu
-        contentToShow = noeud.contenu?.substring(0, 80) + '...' || '';
+        contentToShow = noeud.contenu?.substring(0, 100) + '...' || '';
       } else {
-        // Mode full : tout le contenu
         contentToShow = noeud.contenu || '';
       }
       
-      // Largeur selon le mode
-      const nodeWidth = mode === 'light' ? 150 : mode === 'semi' ? 250 : 350;
+      // Position Y basée sur le niveau
+      const y = niveau * verticalSpacing + 50;
       
+      // Calculer la position X
+      let x: number;
+      if (niveau === 0) {
+        // Nœud racine au centre
+        x = 500;
+      } else if (noeud.enfants && noeud.enfants.length > 0) {
+        // Nœud avec enfants : centré sur ses enfants
+        const childCount = noeud.enfants.length;
+        const totalWidth = (childCount - 1) * horizontalSpacing;
+        x = xOffset + totalWidth / 2;
+      } else {
+        // Feuille : position donnée
+        x = xOffset;
+      }
+      
+      // Créer le nœud
       nodes.push({
         id: currentId,
         type: 'default',
-        position,
+        position: { x, y },
         data: {
           label: (
             <div 
@@ -144,34 +146,12 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
         },
       });
       
-      if (parentId && typeof angleFromParent !== 'undefined') {
-        // Déterminer les handles source/target selon l'angle en mode Toile
-        let sourceHandle = undefined;
-        let targetHandle = undefined;
-        
-        if (visualisation === 'toile' && niveau > 0) {
-          // Déterminer le handle source (d'où part la connexion du parent)
-          if (angleFromParent >= -Math.PI / 4 && angleFromParent < Math.PI / 4) {
-            sourceHandle = 'right'; // Droite
-            targetHandle = 'left';
-          } else if (angleFromParent >= Math.PI / 4 && angleFromParent < 3 * Math.PI / 4) {
-            sourceHandle = 'bottom'; // Bas
-            targetHandle = 'top';
-          } else if (angleFromParent >= 3 * Math.PI / 4 || angleFromParent < -3 * Math.PI / 4) {
-            sourceHandle = 'left'; // Gauche
-            targetHandle = 'right';
-          } else {
-            sourceHandle = 'top'; // Haut
-            targetHandle = 'bottom';
-          }
-        }
-        
+      // Créer le lien vers le parent
+      if (parentId) {
         edges.push({
           id: `edge-${parentId}-${currentId}`,
           source: parentId,
           target: currentId,
-          sourceHandle,
-          targetHandle,
           type: 'smoothstep',
           animated: false,
           style: { 
@@ -181,36 +161,185 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
         });
       }
       
+      // Traiter les enfants
       if (noeud.enfants && noeud.enfants.length > 0) {
-        const childCount = noeud.enfants.length;
+        let currentXOffset = xOffset;
         
-        noeud.enfants.forEach((enfant: any, index: number) => {
-          let childX, childY;
-          let childAngle = 0;
+        // Pour le mode arbre
+        if (visualisation === 'arbre') {
+          // Calculer l'espacement pour centrer les enfants
+          const childCount = noeud.enfants.length;
+          const totalWidth = (childCount - 1) * horizontalSpacing;
+          currentXOffset = x - totalWidth / 2;
           
-          if (visualisation === 'arbre') {
-            // Disposition en arbre vertical
-            const spacing = nodeWidth + 80;
-            childX = position.x + (index - (childCount - 1) / 2) * spacing;
-            childY = position.y + 180;
-          } else {
-            // Disposition en toile (radiale)
-            childAngle = (index / childCount) * 2 * Math.PI - Math.PI / 2;
-            const radius = 280 + niveau * 40;
-            childX = position.x + Math.cos(childAngle) * radius;
-            childY = position.y + Math.sin(childAngle) * radius;
-          }
+          noeud.enfants.forEach((enfant: any, index: number) => {
+            const childX = currentXOffset + (index * horizontalSpacing);
+            convertToNodes(enfant, currentId, niveau + 1, childX, x);
+          });
+        } else {
+          // Mode toile (radial)
+          const childCount = noeud.enfants.length;
+          const radius = 300 + niveau * 50;
           
-          convertToNodes(enfant, currentId, niveau + 1, { x: childX, y: childY }, childAngle);
-        });
+          noeud.enfants.forEach((enfant: any, index: number) => {
+            const angle = (index / childCount) * 2 * Math.PI - Math.PI / 2;
+            const childX = x + Math.cos(angle) * radius;
+            const childY = y + Math.sin(angle) * radius;
+            
+            // Créer le nœud enfant
+            const childId = `node-${nodeId++}`;
+            
+            let childContent = '';
+            if (mode === 'semi') {
+              childContent = enfant.contenu?.substring(0, 100) + '...' || '';
+            } else if (mode === 'full') {
+              childContent = enfant.contenu || '';
+            }
+            
+            nodes.push({
+              id: childId,
+              type: 'default',
+              position: { x: childX, y: childY },
+              data: {
+                label: (
+                  <div 
+                    style={{
+                      padding: '12px',
+                      width: `${nodeWidth}px`,
+                      textAlign: 'center',
+                      overflow: 'hidden',
+                      wordWrap: 'break-word'
+                    }}
+                  >
+                    <div style={{ 
+                      fontWeight: 'bold', 
+                      marginBottom: childContent ? '8px' : '0',
+                      fontSize: '14px'
+                    }}>
+                      {enfant.titre}
+                    </div>
+                    {childContent && (
+                      <div style={{ 
+                        fontSize: '12px', 
+                        color: '#4b5563',
+                        lineHeight: '1.4'
+                      }}>
+                        {childContent}
+                      </div>
+                    )}
+                  </div>
+                ),
+              },
+              style: {
+                background: getColorByLevel(niveau + 1, baseColor),
+                color: '#1f2937',
+                border: `2px solid ${baseColor}`,
+                borderRadius: '12px',
+                fontSize: '13px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                width: `${nodeWidth}px`,
+              },
+            });
+            
+            edges.push({
+              id: `edge-${currentId}-${childId}`,
+              source: currentId,
+              target: childId,
+              type: 'smoothstep',
+              animated: false,
+              style: { 
+                stroke: getColorByLevel(niveau, baseColor), 
+                strokeWidth: 2 
+              },
+            });
+            
+            // Traiter récursivement les sous-enfants
+            if (enfant.enfants && enfant.enfants.length > 0) {
+              // Repositionner pour mode toile
+              convertToNodesRecursive(enfant.enfants, childId, niveau + 2, childX, childY);
+            }
+          });
+        }
       }
+      
+      return x;
     }
     
-    // Position de départ
-    const startX = visualisation === 'arbre' ? 400 : 600;
-    const startY = visualisation === 'arbre' ? 50 : 400;
+    // Fonction auxiliaire pour le mode toile
+    function convertToNodesRecursive(
+      children: any[],
+      parentId: string,
+      niveau: number,
+      parentX: number,
+      parentY: number
+    ) {
+      const childCount = children.length;
+      const radius = 250;
+      
+      children.forEach((enfant: any, index: number) => {
+        const angle = (index / childCount) * 2 * Math.PI;
+        const childX = parentX + Math.cos(angle) * radius;
+        const childY = parentY + Math.sin(angle) * radius;
+        
+        const childId = `node-${nodeId++}`;
+        
+        let childContent = '';
+        if (mode === 'semi') {
+          childContent = enfant.contenu?.substring(0, 100) + '...' || '';
+        } else if (mode === 'full') {
+          childContent = enfant.contenu || '';
+        }
+        
+        nodes.push({
+          id: childId,
+          type: 'default',
+          position: { x: childX, y: childY },
+          data: {
+            label: (
+              <div 
+                style={{
+                  padding: '12px',
+                  width: `${nodeWidth}px`,
+                  textAlign: 'center',
+                  overflow: 'hidden',
+                  wordWrap: 'break-word'
+                }}
+              >
+                <div style={{ fontWeight: 'bold', marginBottom: childContent ? '8px' : '0', fontSize: '14px' }}>
+                  {enfant.titre}
+                </div>
+                {childContent && (
+                  <div style={{ fontSize: '12px', color: '#4b5563', lineHeight: '1.4' }}>
+                    {childContent}
+                  </div>
+                )}
+              </div>
+            ),
+          },
+          style: {
+            background: getColorByLevel(niveau, baseColor),
+            color: '#1f2937',
+            border: `2px solid ${baseColor}`,
+            borderRadius: '12px',
+            fontSize: '13px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+            width: `${nodeWidth}px`,
+          },
+        });
+        
+        edges.push({
+          id: `edge-${parentId}-${childId}`,
+          source: parentId,
+          target: childId,
+          type: 'smoothstep',
+          animated: false,
+          style: { stroke: getColorByLevel(niveau - 1, baseColor), strokeWidth: 2 },
+        });
+      });
+    }
     
-    convertToNodes(structure, null, 0, { x: startX, y: startY });
+    // Lancer la conversion
+    convertToNodes(structure);
     
     return { nodes, edges };
   }, [structure, mode, visualisation]);
@@ -233,7 +362,7 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
         onEdgesChange={onEdgesChange}
         fitView
         attributionPosition="bottom-left"
-        minZoom={0.2}
+        minZoom={0.1}
         maxZoom={2}
       >
         <Background color="#f3f4f6" gap={16} />
@@ -251,4 +380,3 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode, visualisation }) => 
 };
 
 export default MindMap;
-                                                               
