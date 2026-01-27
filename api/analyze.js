@@ -31,33 +31,76 @@ export default async function handler(req, res) {
     hf: !!hfToken 
   });
 
-  const prompt = `Tu es un expert en structuration de contenu éducatif.
+  const prompt = `You are an expert in structuring educational content.
 
-Analyse ce texte et crée une structure hiérarchique en JSON.
+CRITICAL: Analyze the text and respond in THE SAME LANGUAGE as the input text (French if text is in French, English if text is in English, etc.).
 
-FORMAT STRICT :
+Create a PEDAGOGICAL hierarchical structure like a course:
+- Main Topic (niveau 0)
+- Introduction (niveau 1) - ALWAYS first
+- Main Concepts (niveau 1, 2, 3...) - Extract ALL concepts from the document
+- Details and sub-details (niveau 2, 3, 4, 5...) - NO DEPTH LIMIT
+
+DO NOT include "Synthesis", "Summary", or "Conclusion" nodes.
+
+STRICT JSON FORMAT:
 {
-  "titre": "Titre principal du sujet",
+  "titre": "Main topic title IN THE DOCUMENT'S LANGUAGE",
   "niveau": 0,
-  "contenu": "Description courte (50-150 caractères)",
+  "contenu": "Brief description (50-100 chars) IN THE DOCUMENT'S LANGUAGE",
   "enfants": [
     {
-      "titre": "Sous-thème 1",
+      "titre": "Introduction",
       "niveau": 1,
-      "contenu": "Description courte",
+      "contenu": "Context and basic definitions",
+      "enfants": []
+    },
+    {
+      "titre": "First main concept",
+      "niveau": 1,
+      "contenu": "Description",
+      "enfants": [
+        {
+          "titre": "Detail 1.1",
+          "niveau": 2,
+          "contenu": "Explanation",
+          "enfants": [
+            {
+              "titre": "Sub-detail 1.1.1",
+              "niveau": 3,
+              "contenu": "Specific info",
+              "enfants": []
+            }
+          ]
+        },
+        {
+          "titre": "Detail 1.2",
+          "niveau": 2,
+          "contenu": "Another explanation",
+          "enfants": []
+        }
+      ]
+    },
+    {
+      "titre": "Second main concept",
+      "niveau": 1,
+      "contenu": "Description",
       "enfants": []
     }
   ]
 }
 
-RÈGLES :
-- 3-5 branches principales max
-- Max 3 niveaux (0, 1, 2)
-- Contenu court et concis
-- JSON uniquement, pas de backticks
+STRICT RULES:
+1. RESPOND IN THE SAME LANGUAGE AS THE INPUT TEXT
+2. First child MUST be "Introduction" (or equivalent in the document's language)
+3. Extract ALL important concepts and details from the document
+4. NO LIMIT on hierarchy depth - add as many levels as needed
+5. NO "Synthesis", "Summary", "Conclusion" nodes
+6. Content: 50-150 characters per node
+7. Return ONLY valid JSON, no backticks, no text before/after
 
-TEXTE :
-${texte.substring(0, 20000)}`;
+TEXT TO ANALYZE:
+${texte.substring(0, 25000)}`;
 
   // ============================================
   // 1️⃣ GEMINI
@@ -76,7 +119,7 @@ ${texte.substring(0, 20000)}`;
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.3, maxOutputTokens: 8192 }
+            generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
           })
         }
       );
@@ -134,11 +177,11 @@ ${texte.substring(0, 20000)}`;
         body: JSON.stringify({
           model: 'deepseek-chat',
           messages: [
-            { role: 'system', content: 'Tu réponds UNIQUEMENT en JSON valide.' },
+            { role: 'system', content: 'You respond ONLY in valid JSON. Always respond in the same language as the input text.' },
             { role: 'user', content: prompt }
           ],
-          temperature: 0.3,
-          max_tokens: 4000
+          temperature: 0.2,
+          max_tokens: 6000
         })
       });
 
@@ -195,10 +238,10 @@ ${texte.substring(0, 20000)}`;
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            inputs: `<s>[INST] ${prompt.substring(0, 10000)} [/INST]`,
+            inputs: `<s>[INST] ${prompt.substring(0, 12000)} [/INST]`,
             parameters: {
-              max_new_tokens: 2000,
-              temperature: 0.3,
+              max_new_tokens: 3000,
+              temperature: 0.2,
               return_full_text: false
             }
           })
