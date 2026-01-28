@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -9,6 +9,8 @@ import ReactFlow, {
   useEdgesState,
   Position,
   NodeChange,
+  useReactFlow,
+  ReactFlowProvider,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -25,8 +27,20 @@ const COLOR_THEMES = {
   orange: ['#ea580c', '#ed6d23', '#f0823a', '#fb923c', '#fca455', '#fdba74', '#fec993'],
 };
 
-const MindMap: React.FC<MindMapProps> = ({ structure, mode }) => {
+interface NodeDataInfo {
+  id: string;
+  titre: string;
+  niveau: number;
+  parentId: string | null;
+  position: { x: number; y: number };
+}
+
+const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
   const [colorTheme, setColorTheme] = useState<keyof typeof COLOR_THEMES>('indigo');
+  const [zoomedNodeId, setZoomedNodeId] = useState<string | null>(null);
+  const [breadcrumb, setBreadcrumb] = useState<NodeDataInfo[]>([]);
+  const [nodeDataMap, setNodeDataMap] = useState<Map<string, NodeDataInfo>>(new Map());
+  const reactFlowInstance = useReactFlow();
   
   const getColorByLevel = (niveau: number): string => {
     const colors = COLOR_THEMES[colorTheme];
@@ -65,11 +79,55 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode }) => {
     return sizeArray[Math.min(niveau, sizeArray.length - 1)];
   };
   
+  // Gérer le clic sur un nœud
+  const handleNodeClick = useCallback((nodeId: string) => {
+    if (zoomedNodeId === nodeId) {
+      // Dézoom
+      setZoomedNodeId(null);
+      setBreadcrumb([]);
+      setTimeout(() => {
+        reactFlowInstance.fitView({ duration: 500, padding: 0.2 });
+      }, 50);
+    } else {
+      // Zoom
+      setZoomedNodeId(nodeId);
+      
+      // Construire le breadcrumb
+      const path: NodeDataInfo[] = [];
+      let currentId: string | null = nodeId;
+      
+      while (currentId) {
+        const data = nodeDataMap.get(currentId);
+        if (data) {
+          path.unshift(data);
+          currentId = data.parentId;
+        } else {
+          break;
+        }
+      }
+      
+      setBreadcrumb(path);
+      
+      // Centrer sur le nœud
+      const data = nodeDataMap.get(nodeId);
+      if (data) {
+        setTimeout(() => {
+          reactFlowInstance.setCenter(
+            data.position.x + 100, 
+            data.position.y + 50, 
+            { zoom: 1.2, duration: 500 }
+          );
+        }, 50);
+      }
+    }
+  }, [zoomedNodeId, nodeDataMap, reactFlowInstance]);
+  
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     if (!structure) return { nodes: [], edges: [] };
     
     const nodes: Node[] = [];
     const edges: Edge[] = [];
+    const dataMap = new Map<string, NodeDataInfo>();
     let nodeId = 0;
     
     const getHorizontalGap = (niveau: number) => {
@@ -81,9 +139,40 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode }) => {
     
     const verticalGap = 250;
     
-    function createNode(noeud: any, x: number, y: number, niveau: number): string {
+    // Fonction pour vérifier si un nœud doit être affiché
+    const shouldShowNode = (currentId: string): boolean => {
+      if (!zoomedNodeId) return true;
+      if (currentId === zoomedNodeId) return true;
+      
+      // Vérifier si c'est un parent
+      let checkId: string | null = zoomedNodeId;
+      while (checkId) {
+        if (checkId === currentId) return true;
+        const data = dataMap.get(checkId);
+        checkId = data?.parentId || null;
+      }
+      
+      // Vérifier si c'est un enfant
+      const checkChildren = (id: string): boolean => {
+        if (id === zoomedNodeId) return true;
+        const childEdges = edges.filter(e => e.source === id);
+        return childEdges.some(e => checkChildren(e.target));
+      };
+      
+      return checkChildren(currentId);
+    };
+    
+    function createNode(noeud: any, x: number, y: number, niveau: number, parentId: string | null): string {
       const currentId = `node-${nodeId++}`;
       const { width: nodeWidth, height: nodeHeight } = getSizeByLevel(niveau, mode);
+      
+      dataMap.set(currentId, {
+        id: currentId,
+        titre: noeud.titre,
+        niveau: niveau,
+        parentId: parentId,
+        position: { x, y }
+      });
       
       let contentToShow = '';
       let maxChars = 0;
@@ -103,6 +192,9 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode }) => {
       const titleSize = niveau === 0 ? '15px' : niveau === 1 ? '13px' : niveau === 2 ? '12px' : '11px';
       const contentSize = niveau === 0 ? '11px' : niveau === 1 ? '10px' : '9px';
       
+      const isZoomed = zoomedNodeId === currentId;
+      const shouldShow = shouldShowNode(currentId);
+      
       nodes.push({
         id: currentId,
         type: 'default',
@@ -111,16 +203,19 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode }) => {
         targetPosition: Position.Top,
         data: {
           label: (
-            <div style={{
-              width: `${nodeWidth}px`,
-              height: `${nodeHeight}px`,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: niveau === 0 ? '12px' : niveau === 1 ? '10px' : '8px',
-              boxSizing: 'border-box',
-            }}>
+            <div 
+              onClick={() => handleNodeClick(currentId)}
+              style={{
+                width: `${nodeWidth}px`,
+                height: `${nodeHeight}px`,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                padding: niveau === 0 ? '12px' : niveau === 1 ? '10px' : '8px',
+                boxSizing: 'border-box',
+                cursor: 'pointer',
+              }}>
               <div style={{ 
                 fontWeight: niveau <= 2 ? 'bold' : '600',
                 fontSize: titleSize,
@@ -155,19 +250,23 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode }) => {
           niveau: niveau,
         },
         style: {
-          background: getColorByLevel(niveau),
-          color: niveau === 0 ? 'white' : '#1f2937',
-          border: `2px solid ${COLOR_THEMES[colorTheme][0]}`,
+          background: isZoomed ? '#fbbf24' : getColorByLevel(niveau),
+          color: niveau === 0 || isZoomed ? 'white' : '#1f2937',
+          border: isZoomed ? `3px solid #f59e0b` : `2px solid ${COLOR_THEMES[colorTheme][0]}`,
           borderRadius: niveau === 0 ? '10px' : niveau === 1 ? '9px' : '8px',
           fontSize: '12px',
-          boxShadow: niveau === 0 
-            ? '0 4px 8px rgba(0,0,0,0.15)' 
-            : niveau === 1 
-              ? '0 3px 6px rgba(0,0,0,0.1)'
-              : '0 2px 4px rgba(0,0,0,0.08)',
+          boxShadow: isZoomed 
+            ? '0 8px 16px rgba(245, 158, 11, 0.4)'
+            : niveau === 0 
+              ? '0 4px 8px rgba(0,0,0,0.15)' 
+              : niveau === 1 
+                ? '0 3px 6px rgba(0,0,0,0.1)'
+                : '0 2px 4px rgba(0,0,0,0.08)',
           width: `${nodeWidth}px`,
           height: `${nodeHeight}px`,
           padding: 0,
+          opacity: shouldShow ? 1 : 0.3,
+          transition: 'all 0.3s ease',
         },
         draggable: true,
       });
@@ -199,7 +298,7 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode }) => {
     ): void {
       const { width: nodeWidth } = getSizeByLevel(niveau, mode);
       const currentX = centerX - (nodeWidth / 2);
-      const currentId = createNode(noeud, currentX, currentY, niveau);
+      const currentId = createNode(noeud, currentX, currentY, niveau, parentId);
       
       if (parentId) {
         edges.push({
@@ -275,7 +374,7 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode }) => {
     ): string {
       const { width: nodeWidth } = getSizeByLevel(niveau, mode);
       const currentX = centerX - (nodeWidth / 2);
-      const currentId = createNode(noeud, currentX, currentY, niveau);
+      const currentId = createNode(noeud, currentX, currentY, niveau, parentId);
       
       if (parentId) {
         edges.push({
@@ -316,13 +415,43 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode }) => {
     const startX = Math.max(800, treeWidth / 2 + 200);
     buildTree(structure, null, 0, startX, 50);
     
+    setNodeDataMap(dataMap);
+    
     return { nodes, edges };
-  }, [structure, mode, colorTheme]);
+  }, [structure, mode, colorTheme, zoomedNodeId, handleNodeClick]);
   
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   
   const [customPositions, setCustomPositions] = useState<Map<string, {x: number, y: number}>>(new Map());
+  
+  // Navigation entre frères
+  const getSiblings = useCallback(() => {
+    if (!zoomedNodeId) return [];
+    
+    const currentData = nodeDataMap.get(zoomedNodeId);
+    if (!currentData || !currentData.parentId) return [];
+    
+    return Array.from(nodeDataMap.values())
+      .filter(data => data.parentId === currentData.parentId)
+      .sort((a, b) => a.position.x - b.position.x);
+  }, [zoomedNodeId, nodeDataMap]);
+  
+  const navigateToPrevious = () => {
+    const siblings = getSiblings();
+    const currentIndex = siblings.findIndex(s => s.id === zoomedNodeId);
+    if (currentIndex > 0) {
+      handleNodeClick(siblings[currentIndex - 1].id);
+    }
+  };
+  
+  const navigateToNext = () => {
+    const siblings = getSiblings();
+    const currentIndex = siblings.findIndex(s => s.id === zoomedNodeId);
+    if (currentIndex < siblings.length - 1) {
+      handleNodeClick(siblings[currentIndex + 1].id);
+    }
+  };
   
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
     changes.forEach((change) => {
@@ -337,7 +466,7 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode }) => {
     onNodesChange(changes);
   }, [onNodesChange]);
   
-  React.useEffect(() => {
+  useEffect(() => {
     const updatedNodes = initialNodes.map(node => {
       const customPos = customPositions.get(node.id);
       if (customPos) {
@@ -349,8 +478,12 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode }) => {
     setEdges(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges, customPositions]);
   
+  const siblings = getSiblings();
+  const currentIndex = siblings.findIndex(s => s.id === zoomedNodeId);
+  
   return (
     <div style={{ position: 'relative', height: '100%' }}>
+      {/* Sélecteur de couleur */}
       <div style={{ 
         position: 'absolute', 
         top: '10px', 
@@ -380,6 +513,126 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode }) => {
         ))}
       </div>
       
+      {/* Breadcrumb */}
+      {breadcrumb.length > 0 && (
+        <div style={{
+          position: 'absolute',
+          top: '10px',
+          left: '10px',
+          zIndex: 10,
+          background: 'white',
+          padding: '10px 16px',
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          maxWidth: '60%',
+          overflow: 'hidden'
+        }}>
+          <span style={{ fontSize: '16px' }}>🏠</span>
+          {breadcrumb.map((item, index) => (
+            <React.Fragment key={item.id}>
+              {index > 0 && <span style={{ color: '#9ca3af' }}>›</span>}
+              <span style={{
+                color: index === breadcrumb.length - 1 ? '#6366f1' : '#6b7280',
+                fontWeight: index === breadcrumb.length - 1 ? 'bold' : 'normal',
+                fontSize: '13px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '150px'
+              }}>
+                {item.titre}
+              </span>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+      
+      {/* Navigation entre nœuds */}
+      {zoomedNodeId && siblings.length > 1 && (
+        <div style={{
+          position: 'absolute',
+          bottom: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 10,
+          display: 'flex',
+          gap: '10px',
+          background: 'white',
+          padding: '8px',
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        }}>
+          <button
+            onClick={navigateToPrevious}
+            disabled={currentIndex === 0}
+            style={{
+              background: currentIndex === 0 ? '#e5e7eb' : '#6366f1',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              cursor: currentIndex === 0 ? 'not-allowed' : 'pointer',
+              fontWeight: '600',
+              fontSize: '14px'
+            }}
+          >
+            ← Précédent
+          </button>
+          <span style={{
+            padding: '8px 12px',
+            color: '#6b7280',
+            fontSize: '14px',
+            fontWeight: '600'
+          }}>
+            {currentIndex + 1} / {siblings.length}
+          </span>
+          <button
+            onClick={navigateToNext}
+            disabled={currentIndex === siblings.length - 1}
+            style={{
+              background: currentIndex === siblings.length - 1 ? '#e5e7eb' : '#6366f1',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              cursor: currentIndex === siblings.length - 1 ? 'not-allowed' : 'pointer',
+              fontWeight: '600',
+              fontSize: '14px'
+            }}
+          >
+            Suivant →
+          </button>
+        </div>
+      )}
+      
+      {/* Bouton retour vue globale */}
+      {zoomedNodeId && (
+        <button
+          onClick={() => handleNodeClick(zoomedNodeId)}
+          style={{
+            position: 'absolute',
+            bottom: '80px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10,
+            background: '#f59e0b',
+            color: 'white',
+            border: 'none',
+            padding: '10px 20px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontWeight: '600',
+            fontSize: '14px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          }}
+        >
+          🏠 Vue globale
+        </button>
+      )}
+      
       <div style={{ width: '100%', height: '100%', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
         <ReactFlow
           nodes={nodes}
@@ -397,12 +650,28 @@ const MindMap: React.FC<MindMapProps> = ({ structure, mode }) => {
           <Background color="#f3f4f6" gap={16} />
           <Controls />
           <MiniMap 
-            nodeColor={(node) => node.style?.background as string || '#6366f1'}
+            nodeColor={(node) => {
+              if (node.id === zoomedNodeId) return '#fbbf24';
+              return node.style?.background as string || '#6366f1';
+            }}
             maskColor="rgba(0, 0, 0, 0.1)"
+            style={{
+              background: 'white',
+              border: '2px solid #e5e7eb',
+              borderRadius: '8px'
+            }}
           />
         </ReactFlow>
       </div>
     </div>
+  );
+};
+
+const MindMap: React.FC<MindMapProps> = (props) => {
+  return (
+    <ReactFlowProvider>
+      <MindMapContent {...props} />
+    </ReactFlowProvider>
   );
 };
 
