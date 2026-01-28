@@ -1,5 +1,5 @@
 import React, { useState, createContext, useContext } from 'react';
-import { Upload, FolderOpen, Brain, BarChart3, Settings, Plus, FileText, Trash2, Check, X, Globe, Menu, Link as LinkIcon, Eye, Grid, Network } from 'lucide-react';
+import { Upload, FolderOpen, Brain, BarChart3, Settings, Plus, FileText, Trash2, Check, X, Globe, Menu, Link as LinkIcon } from 'lucide-react';
 import { aiService } from './services/ai.service';
 import MindMap from './components/MindMap';
 
@@ -40,9 +40,6 @@ const translations = {
     fullMode: 'Complet',
     semiMode: 'Résumé',
     lightMode: 'Léger',
-    visualization: 'Visualisation',
-    treeView: 'Arbre',
-    webView: 'Toile',
     memoryCards: 'Memory Cards',
     backToMap: 'Retour à la carte'
   },
@@ -72,9 +69,6 @@ const translations = {
     fullMode: 'Full',
     semiMode: 'Summary',
     lightMode: 'Light',
-    visualization: 'Visualization',
-    treeView: 'Tree',
-    webView: 'Web',
     memoryCards: 'Memory Cards',
     backToMap: 'Back to map'
   }
@@ -86,7 +80,6 @@ interface Projet {
   id: string;
   titre: string;
   dossier: string;
-  typeVisualisation: 'arbre' | 'toile';
   dateCreation: Date;
   nombreCards: number;
   progression: number;
@@ -288,7 +281,6 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [nomProjet, setNomProjet] = useState('');
   const [lienURL, setLienURL] = useState('');
-  const [typeVisualisation, setTypeVisualisation] = useState<'arbre' | 'toile'>('arbre');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -360,7 +352,6 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
         id: Date.now().toString(),
         titre: nomProjet,
         dossier: 'Mes projets',
-        typeVisualisation: typeVisualisation,
         dateCreation: new Date(),
         nombreCards: cards.length,
         progression: 0,
@@ -372,9 +363,8 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
       setProjetActif(nouveauProjet);
       
       setTimeout(() => {
-  setActiveView('mindmap');  // ✅ BON
-}, 1000);
-
+        setActiveView('mindmap');
+      }, 1000);
       
     } catch (error) {
       console.error('❌ Erreur:', error);
@@ -399,39 +389,6 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
               placeholder={t('projectName')}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
             />
-
-            
-{/* Choix de la visualisation */}
-<div className="mb-4">
-  <label className="block text-sm font-medium text-gray-700 mb-2">
-    {t('visualization')}
-  </label>
-  <div className="flex gap-2">
-    <button
-      onClick={() => setTypeVisualisation('arbre')}
-      className={`flex-1 px-4 py-3 rounded-lg text-sm flex items-center justify-center gap-2 border-2 ${
-        typeVisualisation === 'arbre' 
-          ? 'bg-indigo-600 text-white border-indigo-600' 
-          : 'bg-white text-gray-700 border-gray-300'
-      }`}
-    >
-      <Grid size={20} />
-      <span>{t('treeView')}</span>
-    </button>
-    <button
-      onClick={() => setTypeVisualisation('toile')}
-      className={`flex-1 px-4 py-3 rounded-lg text-sm flex items-center justify-center gap-2 border-2 ${
-        typeVisualisation === 'toile' 
-          ? 'bg-indigo-600 text-white border-indigo-600' 
-          : 'bg-white text-gray-700 border-gray-300'
-      }`}
-    >
-      <Network size={20} />
-      <span>{t('webView')}</span>
-    </button>
-  </div>
-</div>
-
             
             <input
               ref={fileInputRef}
@@ -541,14 +498,13 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
 const MindMapView = ({ projetActif, setActiveView }: any) => {
   const { t } = useLanguage();
   const [mode, setMode] = useState<'full' | 'semi' | 'light'>('semi');
-  const [visualisation, setVisualisation] = useState<'arbre' | 'toile'>(projetActif?.typeVisualisation || 'arbre');
 
   return (
-    <div className="p-4 lg:p-8">
-      <div className="mb-6">
+    <div className="p-4 lg:p-8 h-full flex flex-col">
+      <div className="mb-4">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">{projetActif?.titre}</h2>
         
-        <div className="flex flex-wrap gap-4 mb-4">
+        <div className="flex gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('viewMode')}</label>
             <div className="flex gap-2">
@@ -572,42 +528,26 @@ const MindMapView = ({ projetActif, setActiveView }: any) => {
               </button>
             </div>
           </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('visualization')}</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setVisualisation('arbre')}
-                className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${visualisation === 'arbre' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}
-              >
-                <Grid size={16} />
-                {t('treeView')}
-              </button>
-              <button
-                onClick={() => setVisualisation('toile')}
-                className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${visualisation === 'toile' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}
-              >
-                <Network size={16} />
-                {t('webView')}
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-md p-4 mb-4">
-        <MindMap structure={projetActif?.structure} mode={mode} visualisation={visualisation} />
+      <div className="bg-white rounded-xl shadow-md flex-1" style={{ minHeight: '600px' }}>
+        {projetActif?.structure && (
+          <MindMap 
+            structure={projetActif.structure} 
+            mode={mode}
+          />
+        )}
       </div>
-
-      <div className="flex justify-between">
+      
+      <div className="mt-4 flex justify-between">
         <button
           onClick={() => setActiveView('projets')}
           className="px-6 py-3 border rounded-lg"
         >
-          {t('cancel')}
+          {t('backToMap')}
         </button>
         <button
-          onClick={() => setActiveView('cards')}
           className="px-6 py-3 bg-green-600 text-white rounded-lg"
         >
           {t('memoryCards')}
@@ -617,64 +557,17 @@ const MindMapView = ({ projetActif, setActiveView }: any) => {
   );
 };
 
-const MemoryCards = ({ setActiveView, projetActif }: any) => {
-  const { t } = useLanguage();
-  const cards = projetActif?.memoryCards || [];
-  
-  return (
-    <div className="p-4 lg:p-8">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">{t('memoryCards')}</h2>
-        <p className="text-gray-600">{cards.length} {t('cards')}</p>
-      </div>
-
-      <div className="grid gap-4">
-        {cards.map((card: any) => (
-          <div key={card.id} className="bg-white rounded-xl shadow-md p-6">
-            <div className="text-sm text-indigo-600 mb-1">{card.theme}</div>
-            <div className="font-bold text-lg mb-2">{card.question}</div>
-            <div className="text-gray-600">{card.reponse}</div>
-          </div>
-        ))}
-      </div>
-
-      <button
-        onClick={() => setActiveView('mindmap')}
-        className="mt-6 px-6 py-3 border rounded-lg"
-      >
-        {t('backToMap')}
-      </button>
-    </div>
-  );
-};
-
-const Statistiques = () => (
-  <div className="p-8">
-    <h2 className="text-3xl font-bold mb-6">Statistiques</h2>
-    <div className="bg-white rounded-xl p-6">
-      <p className="text-gray-600">Pas encore de données</p>
-    </div>
-  </div>
-);
-
-export default function App() {
-  const [activeView, setActiveView] = useState('projets');
-  const [projetActif, setProjetActif] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+function App() {
   const [lang, setLang] = useState('fr');
+  const [activeView, setActiveView] = useState('projets');
+  const [projetActif, setProjetActif] = useState<Projet | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const t = (key: string) => (translations as any)[lang]?.[key] || key;
-
-  const langContext = { lang, setLang, t };
-
-  const languages = [
-    { code: 'fr', name: 'Français', flag: '🇫🇷' },
-    { code: 'en', name: 'English', flag: '🇬🇧' }
-  ];
+  const t = (key: string) => translations[lang as keyof typeof translations][key as keyof typeof translations['fr']] || key;
 
   return (
-    <LanguageContext.Provider value={langContext}>
-      <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <LanguageContext.Provider value={{ lang, setLang, t }}>
+      <div className="flex h-screen bg-gray-50">
         <Sidebar 
           activeView={activeView} 
           setActiveView={setActiveView}
@@ -682,54 +575,39 @@ export default function App() {
           setIsOpen={setSidebarOpen}
         />
         
-        <div className="flex-1 overflow-auto flex flex-col">
-          <div className="bg-white border-b px-4 py-3 flex items-center justify-between sticky top-0 z-30">
-            <button
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <header className="bg-white border-b border-gray-200 px-4 lg:px-8 py-4 flex items-center justify-between">
+            <button 
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
+              className="lg:hidden text-gray-600"
             >
-              <Menu className="w-6 h-6 text-indigo-600" />
+              <Menu size={24} />
             </button>
-            <h1 className="text-lg font-bold lg:hidden">{t('appName')}</h1>
-            
-            <div className="relative group">
-              <button className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 rounded-lg">
-                <Globe size={20} />
-                <span className="hidden sm:inline">{languages.find(l => l.code === lang)?.flag}</span>
-              </button>
-              
-              <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-xl border py-2 min-w-[160px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-                {languages.map(language => (
-                  <button
-                    key={language.code}
-                    onClick={() => setLang(language.code)}
-                    className={`w-full px-4 py-2 text-left hover:bg-indigo-50 flex items-center gap-2 ${lang === language.code ? 'bg-indigo-100' : ''}`}
-                  >
-                    <span>{language.flag}</span>
-                    <span className="text-sm">{language.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+            <div className="flex-1"></div>
+            <button 
+              onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100"
+            >
+              <Globe size={20} />
+              <span className="hidden sm:inline">{lang === 'fr' ? 'FR' : 'EN'}</span>
+            </button>
+          </header>
           
-          <div className="flex-1">
-            {activeView === 'projets' && <AccueilProjets setActiveView={setActiveView} setProjetActif={setProjetActif} />}
-            {activeView === 'nouveau' && <NouveauProjet setActiveView={setActiveView} setProjetActif={setProjetActif} />}
-            {activeView === 'mindmap' && <MindMapView projetActif={projetActif} setActiveView={setActiveView} />}
-            {activeView === 'cards' && <MemoryCards setActiveView={setActiveView} projetActif={projetActif} />}
-            {activeView === 'statistiques' && <Statistiques />}
-            {activeView === 'parametres' && (
-              <div className="p-8">
-                <h2 className="text-2xl font-bold mb-4">Paramètres</h2>
-                <div className="bg-white rounded-xl p-6">
-                  <p className="text-gray-600">Configuration à venir...</p>
-                </div>
-              </div>
+          <main className="flex-1 overflow-auto">
+            {activeView === 'projets' && (
+              <AccueilProjets setActiveView={setActiveView} setProjetActif={setProjetActif} />
             )}
-          </div>
+            {activeView === 'nouveau' && (
+              <NouveauProjet setActiveView={setActiveView} setProjetActif={setProjetActif} />
+            )}
+            {activeView === 'mindmap' && projetActif && (
+              <MindMapView projetActif={projetActif} setActiveView={setActiveView} />
+            )}
+          </main>
         </div>
       </div>
     </LanguageContext.Provider>
   );
 }
+
+export default App;
