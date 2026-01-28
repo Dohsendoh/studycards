@@ -34,6 +34,7 @@ interface NodeInfo {
   parentId: string | null;
   x: number;
   y: number;
+  width: number;
   childrenIds: string[];
 }
 
@@ -89,7 +90,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
         const introInfo = nodesInfoMap.get(introductionNodeId);
         if (introInfo) {
           setTimeout(() => {
-            reactFlow.setCenter(introInfo.x + 100, introInfo.y + 50, { zoom: 1, duration: 500 });
+            reactFlow.setCenter(introInfo.x + introInfo.width / 2, introInfo.y + 50, { zoom: 1, duration: 500 });
           }, 100);
         }
       }
@@ -100,26 +101,33 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
       if (info) {
         const allChildrenIds = info.childrenIds;
         let minX = info.x;
-        let maxX = info.x + getSizeByLevel(info.niveau, mode).width;
+        let maxX = info.x + info.width;
         let minY = info.y;
         let maxY = info.y + getSizeByLevel(info.niveau, mode).height;
         
         allChildrenIds.forEach(childId => {
           const childInfo = nodesInfoMap.get(childId);
           if (childInfo) {
-            const childSize = getSizeByLevel(childInfo.niveau, mode);
             minX = Math.min(minX, childInfo.x);
-            maxX = Math.max(maxX, childInfo.x + childSize.width);
+            maxX = Math.max(maxX, childInfo.x + childInfo.width);
             minY = Math.min(minY, childInfo.y);
-            maxY = Math.max(maxY, childInfo.y + childSize.height);
+            maxY = Math.max(maxY, childInfo.y + getSizeByLevel(childInfo.niveau, mode).height);
           }
         });
         
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
+        const width = maxX - minX;
+        const height = maxY - minY;
+        
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        const zoomX = (windowWidth * 0.8) / width;
+        const zoomY = (windowHeight * 0.8) / height;
+        const targetZoom = Math.min(zoomX, zoomY, 1.5);
         
         setTimeout(() => {
-          reactFlow.setCenter(centerX, centerY, { zoom: 1.2, duration: 500 });
+          reactFlow.setCenter(centerX, centerY, { zoom: targetZoom, duration: 500 });
         }, 100);
       }
     }
@@ -134,17 +142,27 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
     let nodeId = 0;
     let introId: string | null = null;
     
-    const getHorizontalGap = (niveau: number) => {
-      if (niveau <= 2) return 40;
-      if (niveau === 3) return 30;
-      return 20;
-    };
-    
+    const horizontalGap = 20;
     const verticalGap = 200;
     
-    function createNode(noeud: any, x: number, y: number, niveau: number, parentId: string | null): string {
+    function calculateTreeWidth(noeud: any, niveau: number): number {
+      const { width } = getSizeByLevel(niveau, mode);
+      
+      if (!noeud.enfants || noeud.enfants.length === 0) {
+        return width;
+      }
+      
+      const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child, niveau + 1));
+      const totalChildWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
+      const gaps = (noeud.enfants.length - 1) * horizontalGap;
+      
+      return Math.max(width, totalChildWidth + gaps);
+    }
+    
+    function createNode(noeud: any, x: number, y: number, niveau: number, parentId: string | null, nodeWidth: number): string {
       const currentId = `node-${nodeId++}`;
-      const { width: nodeWidth, height: nodeHeight } = getSizeByLevel(niveau, mode);
+      const { width: defaultWidth, height: nodeHeight } = getSizeByLevel(niveau, mode);
+      const actualWidth = nodeWidth || defaultWidth;
       
       if (niveau === 1 && noeud.titre?.toLowerCase().includes('introduction')) {
         introId = currentId;
@@ -157,6 +175,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
         parentId: parentId,
         x: x,
         y: y,
+        width: actualWidth,
         childrenIds: []
       });
       
@@ -187,7 +206,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
         data: {
           label: (
             <div style={{
-              width: `${nodeWidth}px`,
+              width: `${actualWidth}px`,
               height: `${nodeHeight}px`,
               display: 'flex',
               flexDirection: 'column',
@@ -241,7 +260,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
             : niveau === 1 
               ? '0 4px 8px rgba(0,0,0,0.12)'
               : '0 2px 6px rgba(0,0,0,0.08)',
-          width: `${nodeWidth}px`,
+          width: `${actualWidth}px`,
           height: `${nodeHeight}px`,
           padding: 0,
         },
@@ -251,32 +270,17 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
       return currentId;
     }
     
-    function calculateTreeWidth(noeud: any, niveau: number): number {
-      const { width } = getSizeByLevel(niveau, mode);
-      
-      if (!noeud.enfants || noeud.enfants.length === 0) {
-        return width;
-      }
-      
-      const horizontalGap = getHorizontalGap(niveau);
-      const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child, niveau + 1));
-      const totalChildWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
-      const gaps = (noeud.enfants.length - 1) * horizontalGap;
-      
-      return Math.max(width, totalChildWidth + gaps);
-    }
-    
     function buildTree(
       noeud: any, 
       parentId: string | null, 
       niveau: number, 
       centerX: number, 
       currentY: number,
-      showEdges: boolean = true
+      showEdges: boolean = false
     ): void {
-      const { width: nodeWidth } = getSizeByLevel(niveau, mode);
-      const currentX = centerX - (nodeWidth / 2);
-      const currentId = createNode(noeud, currentX, currentY, niveau, parentId);
+      const treeWidth = calculateTreeWidth(noeud, niveau);
+      const currentX = centerX - (treeWidth / 2);
+      const currentId = createNode(noeud, currentX, currentY, niveau, parentId, treeWidth);
       
       if (parentId) {
         const parentInfo = infoMap.get(parentId);
@@ -314,7 +318,6 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
             
             if (autresEnfants.length > 0) {
               const axesY = introY + verticalGap;
-              const horizontalGap = getHorizontalGap(1);
               const childrenWidths = autresEnfants.map((child: any) => calculateTreeWidth(child, 2));
               const totalWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
               const totalGaps = (autresEnfants.length - 1) * horizontalGap;
@@ -325,14 +328,13 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
               autresEnfants.forEach((child: any, index: number) => {
                 const childWidth = childrenWidths[index];
                 const childCenterX = currentChildX + (childWidth / 2);
-                buildTree(child, introId, 2, childCenterX, axesY, false);
+                buildTree(child, introId, 2, childCenterX, axesY, true);
                 currentChildX += childWidth + horizontalGap;
               });
             }
           }
         } else {
           const childY = currentY + verticalGap;
-          const horizontalGap = getHorizontalGap(niveau);
           const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child, niveau + 1));
           const totalWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
           const totalGaps = (noeud.enfants.length - 1) * horizontalGap;
@@ -356,11 +358,11 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
       niveau: number, 
       centerX: number, 
       currentY: number,
-      showEdges: boolean = true
+      showEdges: boolean = false
     ): string {
-      const { width: nodeWidth } = getSizeByLevel(niveau, mode);
-      const currentX = centerX - (nodeWidth / 2);
-      const currentId = createNode(noeud, currentX, currentY, niveau, parentId);
+      const treeWidth = calculateTreeWidth(noeud, niveau);
+      const currentX = centerX - (treeWidth / 2);
+      const currentId = createNode(noeud, currentX, currentY, niveau, parentId, treeWidth);
       
       if (parentId) {
         const parentInfo = infoMap.get(parentId);
@@ -385,7 +387,6 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
       
       if (noeud.enfants && noeud.enfants.length > 0) {
         const childY = currentY + verticalGap;
-        const horizontalGap = getHorizontalGap(niveau);
         const childrenWidths = noeud.enfants.map((child: any) => calculateTreeWidth(child, niveau + 1));
         const totalWidth = childrenWidths.reduce((sum: number, w: number) => sum + w, 0);
         const totalGaps = (noeud.enfants.length - 1) * horizontalGap;
@@ -406,7 +407,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
     
     const treeWidth = calculateTreeWidth(structure, 0);
     const startX = Math.max(800, treeWidth / 2 + 200);
-    buildTree(structure, null, 0, startX, 50);
+    buildTree(structure, null, 0, startX, 50, true);
     
     setNodesInfoMap(infoMap);
     if (introId) {
@@ -425,7 +426,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
       const introInfo = nodesInfoMap.get(introductionNodeId);
       if (introInfo) {
         setTimeout(() => {
-          reactFlow.setCenter(introInfo.x + 100, introInfo.y + 50, { zoom: 1, duration: 800 });
+          reactFlow.setCenter(introInfo.x + introInfo.width / 2, introInfo.y + 50, { zoom: 1, duration: 800 });
         }, 500);
       }
     }
@@ -442,8 +443,8 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
       const zoomedInfo = nodesInfoMap.get(zoomedNodeId);
       if (!zoomedInfo) return eds;
       
-      const visibleEdges = eds.filter(edge => {
-        return zoomedInfo.childrenIds.includes(edge.target);
+      const visibleEdges = initialEdges.filter(edge => {
+        return zoomedInfo.childrenIds.includes(edge.target) || edge.target === zoomedNodeId;
       });
       
       return visibleEdges;
@@ -459,12 +460,19 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
         const isChild = zoomedNodeId && nodesInfoMap.get(zoomedNodeId)?.childrenIds.includes(node.id);
         
         let opacity = 1;
-        let boxShadow = node.style?.boxShadow;
+        let boxShadow = node.data.niveau === 0 
+          ? '0 6px 12px rgba(0,0,0,0.15)' 
+          : node.data.niveau === 1 
+            ? '0 4px 8px rgba(0,0,0,0.12)'
+            : '0 2px 6px rgba(0,0,0,0.08)';
         
         if (zoomedNodeId) {
           if (isZoomed) {
             const baseColor = COLOR_THEMES[colorTheme][0];
-            boxShadow = `0 0 0 8px ${baseColor}40, 0 0 0 16px ${baseColor}20, 0 0 0 24px ${baseColor}10, 0 0 0 32px ${baseColor}05`;
+            const r = parseInt(baseColor.slice(1, 3), 16);
+            const g = parseInt(baseColor.slice(3, 5), 16);
+            const b = parseInt(baseColor.slice(5, 7), 16);
+            boxShadow = `0 0 0 6px rgba(${r}, ${g}, ${b}, 0.3), 0 0 0 14px rgba(${r}, ${g}, ${b}, 0.15), 0 0 0 24px rgba(${r}, ${g}, ${b}, 0.08), 0 0 0 36px rgba(${r}, ${g}, ${b}, 0.03)`;
           } else if (isParent) {
             opacity = 0.4;
           } else if (!isChild) {
@@ -478,7 +486,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
             ...node.style,
             opacity,
             boxShadow,
-            transition: 'all 0.3s ease',
+            transition: 'opacity 0.3s ease, box-shadow 0.3s ease',
           },
         };
       })
@@ -520,6 +528,16 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
           newMap.set(change.id, change.position!);
           return newMap;
         });
+        
+        setNodesInfoMap(prev => {
+          const newMap = new Map(prev);
+          const info = newMap.get(change.id);
+          if (info) {
+            info.x = change.position!.x;
+            info.y = change.position!.y;
+          }
+          return newMap;
+        });
       }
     });
     onNodesChange(changes);
@@ -541,10 +559,10 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
   const currentIndex = siblings.findIndex(s => s.id === zoomedNodeId);
   
   return (
-    <div style={{ position: 'relative', height: '100%' }}>
+    <div style={{ position: 'relative', height: '100%', width: '100%' }}>
       <div style={{ 
         position: 'absolute', 
-        top: '10px', 
+        top: '100px', 
         left: '10px', 
         zIndex: 10,
       }}>
