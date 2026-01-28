@@ -36,28 +36,28 @@ return colors[Math.min(niveau, colors.length - 1)];
 const getSizeByLevel = (niveau: number, mode: string) => {
 const sizes = {
 light: [
-{ width: 180, height: 80 },
-{ width: 160, height: 75 },
-{ width: 140, height: 70 },
-{ width: 120, height: 65 },
-{ width: 100, height: 60 },
-{ width: 90, height: 55 },
+{ width: 200, height: 90 },
+{ width: 180, height: 85 },
+{ width: 160, height: 80 },
+{ width: 140, height: 75 },
+{ width: 120, height: 70 },
+{ width: 100, height: 65 },
 ],
 semi: [
-{ width: 260, height: 120 },
-{ width: 220, height: 110 },
-{ width: 180, height: 100 },
-{ width: 150, height: 90 },
-{ width: 130, height: 85 },
-{ width: 110, height: 80 },
+{ width: 280, height: 130 },
+{ width: 240, height: 120 },
+{ width: 200, height: 110 },
+{ width: 170, height: 100 },
+{ width: 140, height: 90 },
+{ width: 120, height: 85 },
 ],
 full: [
-{ width: 320, height: 150 },
-{ width: 280, height: 140 },
-{ width: 240, height: 130 },
-{ width: 200, height: 120 },
-{ width: 170, height: 110 },
-{ width: 150, height: 100 },
+{ width: 350, height: 160 },
+{ width: 300, height: 150 },
+{ width: 260, height: 140 },
+{ width: 220, height: 130 },
+{ width: 180, height: 120 },
+{ width: 160, height: 110 },
 ],
 };
 
@@ -77,13 +77,13 @@ const edges: Edge[] = [];
 let nodeId = 0;
 
 const getHorizontalGap = (niveau: number) => {
-  if (niveau <= 1) return 100;
-  if (niveau === 2) return 80;
-  if (niveau === 3) return 50;
-  return 30;
+  if (niveau <= 1) return 120;
+  if (niveau === 2) return 100;
+  if (niveau === 3) return 60;
+  return 40;
 };
 
-const verticalGap = 250;
+const verticalGap = 280;
 
 function createNode(noeud: any, x: number, y: number, niveau: number): string {
   const currentId = `node-${nodeId++}`;
@@ -104,8 +104,8 @@ function createNode(noeud: any, x: number, y: number, niveau: number): string {
     contentToShow += '...';
   }
   
-  const titleSize = niveau === 0 ? '15px' : niveau === 1 ? '13px' : niveau === 2 ? '12px' : '11px';
-  const contentSize = niveau === 0 ? '11px' : niveau === 1 ? '10px' : '9px';
+  const titleSize = niveau === 0 ? '16px' : niveau === 1 ? '15px' : niveau === 2 ? '14px' : '13px';
+  const contentSize = niveau === 0 ? '12px' : niveau === 1 ? '11px' : '10px';
   
   nodes.push({
     id: currentId,
@@ -122,13 +122,13 @@ function createNode(noeud: any, x: number, y: number, niveau: number): string {
           flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
-          padding: niveau === 0 ? '12px' : niveau === 1 ? '10px' : '8px',
+          padding: niveau === 0 ? '16px' : niveau === 1 ? '14px' : '12px',
           boxSizing: 'border-box',
         }}>
           <div style={{ 
             fontWeight: niveau <= 2 ? 'bold' : '600',
             fontSize: titleSize,
-            marginBottom: contentToShow ? '4px' : '0',
+            marginBottom: contentToShow ? '6px' : '0',
             width: '100%',
             textAlign: 'center',
             overflow: 'hidden',
@@ -143,7 +143,7 @@ function createNode(noeud: any, x: number, y: number, niveau: number): string {
             <div style={{ 
               fontSize: contentSize,
               color: niveau === 0 ? '#e0e7ff' : '#4b5563',
-              lineHeight: '1.2',
+              lineHeight: '1.3',
               width: '100%',
               textAlign: 'center',
               overflow: 'hidden',
@@ -161,14 +161,14 @@ function createNode(noeud: any, x: number, y: number, niveau: number): string {
     style: {
       background: getColorByLevel(niveau),
       color: niveau === 0 ? 'white' : '#1f2937',
-      border: `2px solid ${COLOR_THEMES[colorTheme][0]}`,
-      borderRadius: niveau === 0 ? '10px' : niveau === 1 ? '9px' : '8px',
-      fontSize: '12px',
+      border: `3px solid ${COLOR_THEMES[colorTheme][0]}`,
+      borderRadius: niveau === 0 ? '12px' : niveau === 1 ? '10px' : '8px',
+      fontSize: '13px',
       boxShadow: niveau === 0 
-        ? '0 4px 8px rgba(0,0,0,0.15)' 
+        ? '0 6px 12px rgba(0,0,0,0.15)' 
         : niveau === 1 
-          ? '0 3px 6px rgba(0,0,0,0.1)'
-          : '0 2px 4px rgba(0,0,0,0.08)',
+          ? '0 4px 8px rgba(0,0,0,0.12)'
+          : '0 2px 6px rgba(0,0,0,0.08)',
       width: `${nodeWidth}px`,
       height: `${nodeHeight}px`,
       padding: 0,
@@ -214,7 +214,7 @@ function buildTree(
       animated: false,
       style: { 
         stroke: getColorByLevel(niveau - 1), 
-        strokeWidth: 2 
+        strokeWidth: 3 
       },
     });
   }
@@ -290,7 +290,7 @@ function buildTreeAndReturnId(
       animated: false,
       style: { 
         stroke: getColorByLevel(niveau - 1), 
-        strokeWidth: 2 
+        strokeWidth: 3 
       },
     });
   }
@@ -363,31 +363,32 @@ top: ‘10px’,
 right: ‘10px’,
 zIndex: 10,
 display: ‘flex’,
-gap: ‘6px’,
+gap: ‘8px’,
 background: ‘white’,
-padding: ‘6px’,
-borderRadius: ‘8px’,
-boxShadow: ‘0 2px 8px rgba(0,0,0,0.1)’
+padding: ‘8px’,
+borderRadius: ‘10px’,
+boxShadow: ‘0 4px 12px rgba(0,0,0,0.1)’
 }}>
 {Object.keys(COLOR_THEMES).map((theme) => (
 <button
 key={theme}
 onClick={() => setColorTheme(theme as keyof typeof COLOR_THEMES)}
 style={{
-width: ‘28px’,
-height: ‘28px’,
-borderRadius: ‘6px’,
+width: ‘32px’,
+height: ‘32px’,
+borderRadius: ‘8px’,
 border: colorTheme === theme ? ‘3px solid #1f2937’ : ‘2px solid #e5e7eb’,
 background: COLOR_THEMES[theme as keyof typeof COLOR_THEMES][0],
 cursor: ‘pointer’,
-transition: ‘all 0.2s’
+transition: ‘all 0.2s’,
+boxShadow: colorTheme === theme ? ‘0 2px 6px rgba(0,0,0,0.15)’ : ‘none’
 }}
 />
 ))}
 </div>
 
 ```
-  <div style={{ width: '100%', height: '100%', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+  <div style={{ width: '100%', height: '100%', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
     <ReactFlow
       nodes={nodes}
       edges={edges}
@@ -401,11 +402,16 @@ transition: ‘all 0.2s’
       nodesDraggable={true}
       nodesConnectable={false}
     >
-      <Background color="#f3f4f6" gap={16} />
+      <Background color="#f3f4f6" gap={20} size={1} />
       <Controls />
       <MiniMap 
         nodeColor={(node) => node.style?.background as string || '#6366f1'}
         maskColor="rgba(0, 0, 0, 0.1)"
+        style={{
+          background: 'white',
+          border: '2px solid #e5e7eb',
+          borderRadius: '10px'
+        }}
       />
     </ReactFlow>
   </div>
