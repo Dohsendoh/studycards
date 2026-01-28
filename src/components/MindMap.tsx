@@ -9,8 +9,6 @@ useNodesState,
 useEdgesState,
 Position,
 NodeChange,
-useReactFlow,
-ReactFlowProvider,
 } from ‘reactflow’;
 import ‘reactflow/dist/style.css’;
 
@@ -27,21 +25,8 @@ green: [’#059669’, ‘#10a576’, ‘#1eb383’, ‘#34d399’, ‘#52dca8�
 orange: [’#ea580c’, ‘#ed6d23’, ‘#f0823a’, ‘#fb923c’, ‘#fca455’, ‘#fdba74’, ‘#fec993’],
 };
 
-interface NodeInfo {
-id: string;
-titre: string;
-niveau: number;
-parentId: string | null;
-x: number;
-y: number;
-}
-
-const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
+const MindMap: React.FC<MindMapProps> = ({ structure, mode }) => {
 const [colorTheme, setColorTheme] = useState<keyof typeof COLOR_THEMES>(‘indigo’);
-const [zoomedNodeId, setZoomedNodeId] = useState<string | null>(null);
-const [breadcrumb, setBreadcrumb] = useState<NodeInfo[]>([]);
-const [nodesInfo, setNodesInfo] = useState<Map<string, NodeInfo>>(new Map());
-const reactFlow = useReactFlow();
 
 const getColorByLevel = (niveau: number): string => {
 const colors = COLOR_THEMES[colorTheme];
@@ -83,57 +68,12 @@ return sizeArray[Math.min(niveau, sizeArray.length - 1)];
 
 };
 
-// Fonction de clic sur un nœud
-const onNodeClick = useCallback((event: any, node: Node) => {
-event.stopPropagation();
-
-```
-if (zoomedNodeId === node.id) {
-  // Dézoom
-  setZoomedNodeId(null);
-  setBreadcrumb([]);
-  setTimeout(() => {
-    reactFlow.fitView({ duration: 500, padding: 0.2 });
-  }, 100);
-} else {
-  // Zoom
-  setZoomedNodeId(node.id);
-  
-  // Construire breadcrumb
-  const path: NodeInfo[] = [];
-  let currentId: string | null = node.id;
-  
-  while (currentId) {
-    const info = nodesInfo.get(currentId);
-    if (info) {
-      path.unshift(info);
-      currentId = info.parentId;
-    } else {
-      break;
-    }
-  }
-  
-  setBreadcrumb(path);
-  
-  // Centrer sur le nœud
-  const info = nodesInfo.get(node.id);
-  if (info) {
-    setTimeout(() => {
-      reactFlow.setCenter(info.x + 100, info.y + 50, { zoom: 1.2, duration: 500 });
-    }, 100);
-  }
-}
-```
-
-}, [zoomedNodeId, nodesInfo, reactFlow]);
-
 const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
 if (!structure) return { nodes: [], edges: [] };
 
 ```
 const nodes: Node[] = [];
 const edges: Edge[] = [];
-const infoMap = new Map<string, NodeInfo>();
 let nodeId = 0;
 
 const getHorizontalGap = (niveau: number) => {
@@ -145,19 +85,9 @@ const getHorizontalGap = (niveau: number) => {
 
 const verticalGap = 250;
 
-function createNode(noeud: any, x: number, y: number, niveau: number, parentId: string | null): string {
+function createNode(noeud: any, x: number, y: number, niveau: number): string {
   const currentId = `node-${nodeId++}`;
   const { width: nodeWidth, height: nodeHeight } = getSizeByLevel(niveau, mode);
-  
-  // Stocker les infos
-  infoMap.set(currentId, {
-    id: currentId,
-    titre: noeud.titre,
-    niveau: niveau,
-    parentId: parentId,
-    x: x,
-    y: y
-  });
   
   let contentToShow = '';
   let maxChars = 0;
@@ -194,7 +124,6 @@ function createNode(noeud: any, x: number, y: number, niveau: number, parentId: 
           alignItems: 'center',
           padding: niveau === 0 ? '12px' : niveau === 1 ? '10px' : '8px',
           boxSizing: 'border-box',
-          cursor: 'pointer',
         }}>
           <div style={{ 
             fontWeight: niveau <= 2 ? 'bold' : '600',
@@ -274,7 +203,7 @@ function buildTree(
 ): void {
   const { width: nodeWidth } = getSizeByLevel(niveau, mode);
   const currentX = centerX - (nodeWidth / 2);
-  const currentId = createNode(noeud, currentX, currentY, niveau, parentId);
+  const currentId = createNode(noeud, currentX, currentY, niveau);
   
   if (parentId) {
     edges.push({
@@ -350,7 +279,7 @@ function buildTreeAndReturnId(
 ): string {
   const { width: nodeWidth } = getSizeByLevel(niveau, mode);
   const currentX = centerX - (nodeWidth / 2);
-  const currentId = createNode(noeud, currentX, currentY, niveau, parentId);
+  const currentId = createNode(noeud, currentX, currentY, niveau);
   
   if (parentId) {
     edges.push({
@@ -391,9 +320,6 @@ const treeWidth = calculateTreeWidth(structure, 0);
 const startX = Math.max(800, treeWidth / 2 + 200);
 buildTree(structure, null, 0, startX, 50);
 
-// Sauvegarder la map
-setNodesInfo(infoMap);
-
 return { nodes, edges };
 ```
 
@@ -401,131 +327,8 @@ return { nodes, edges };
 
 const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
 const [customPositions, setCustomPositions] = useState<Map<string, {x: number, y: number}>>(new Map());
-
-// Appliquer le style zoom
-useEffect(() => {
-setNodes((nds) =>
-nds.map((node) => {
-const isZoomed = node.id === zoomedNodeId;
-const shouldShow = !zoomedNodeId || isRelatedNode(node.id, zoomedNodeId, nodesInfo);
-
-```
-    return {
-      ...node,
-      style: {
-        ...node.style,
-        background: isZoomed ? '#fbbf24' : getColorByLevel(node.data.niveau),
-        color: (node.data.niveau === 0 || isZoomed) ? 'white' : '#1f2937',
-        border: isZoomed ? '3px solid #f59e0b' : node.style?.border,
-        boxShadow: isZoomed 
-          ? '0 8px 16px rgba(245, 158, 11, 0.4)'
-          : node.style?.boxShadow,
-        opacity: shouldShow ? 1 : 0.3,
-        transition: 'all 0.3s ease',
-      },
-    };
-  })
-);
-```
-
-}, [zoomedNodeId, nodesInfo, setNodes]);
-
-// Vérifier si un nœud est lié
-function isRelatedNode(nodeId: string, zoomedId: string, infoMap: Map<string, NodeInfo>): boolean {
-if (nodeId === zoomedId) return true;
-
-```
-// Parent
-let current: string | null = zoomedId;
-while (current) {
-  if (current === nodeId) return true;
-  const info = infoMap.get(current);
-  current = info?.parentId || null;
-}
-
-// Enfant
-const checkChild = (id: string): boolean => {
-  if (id === zoomedId) return true;
-  const children = Array.from(infoMap.values()).filter(n => n.parentId === id);
-  return children.some(c => checkChild(c.id));
-};
-
-return checkChild(nodeId);
-```
-
-}
-
-// Navigation entre frères
-const getSiblings = useCallback(() => {
-if (!zoomedNodeId) return [];
-
-```
-const current = nodesInfo.get(zoomedNodeId);
-if (!current || !current.parentId) return [];
-
-return Array.from(nodesInfo.values())
-  .filter(n => n.parentId === current.parentId)
-  .sort((a, b) => a.x - b.x);
-```
-
-}, [zoomedNodeId, nodesInfo]);
-
-const navigateToPrevious = () => {
-const siblings = getSiblings();
-const idx = siblings.findIndex(s => s.id === zoomedNodeId);
-if (idx > 0) {
-const target = siblings[idx - 1];
-setZoomedNodeId(target.id);
-
-```
-  // Breadcrumb
-  const path: NodeInfo[] = [];
-  let currentId: string | null = target.id;
-  while (currentId) {
-    const info = nodesInfo.get(currentId);
-    if (info) {
-      path.unshift(info);
-      currentId = info.parentId;
-    } else break;
-  }
-  setBreadcrumb(path);
-  
-  setTimeout(() => {
-    reactFlow.setCenter(target.x + 100, target.y + 50, { zoom: 1.2, duration: 500 });
-  }, 100);
-}
-```
-
-};
-
-const navigateToNext = () => {
-const siblings = getSiblings();
-const idx = siblings.findIndex(s => s.id === zoomedNodeId);
-if (idx < siblings.length - 1) {
-const target = siblings[idx + 1];
-setZoomedNodeId(target.id);
-
-```
-  // Breadcrumb
-  const path: NodeInfo[] = [];
-  let currentId: string | null = target.id;
-  while (currentId) {
-    const info = nodesInfo.get(currentId);
-    if (info) {
-      path.unshift(info);
-      currentId = info.parentId;
-    } else break;
-  }
-  setBreadcrumb(path);
-  
-  setTimeout(() => {
-    reactFlow.setCenter(target.x + 100, target.y + 50, { zoom: 1.2, duration: 500 });
-  }, 100);
-}
-```
-
-};
 
 const handleNodesChange = useCallback((changes: NodeChange[]) => {
 changes.forEach((change) => {
@@ -552,12 +355,8 @@ setNodes(updatedNodes);
 setEdges(initialEdges);
 }, [initialNodes, initialEdges, setNodes, setEdges, customPositions]);
 
-const siblings = getSiblings();
-const currentIndex = siblings.findIndex(s => s.id === zoomedNodeId);
-
 return (
 <div style={{ position: ‘relative’, height: ‘100%’ }}>
-{/* Sélecteur couleur */}
 <div style={{
 position: ‘absolute’,
 top: ‘10px’,
@@ -588,137 +387,12 @@ transition: ‘all 0.2s’
 </div>
 
 ```
-  {/* Breadcrumb */}
-  {breadcrumb.length > 0 && (
-    <div style={{
-      position: 'absolute',
-      top: '10px',
-      left: '10px',
-      zIndex: 10,
-      background: 'white',
-      padding: '10px 16px',
-      borderRadius: '8px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      maxWidth: '60%',
-      overflow: 'hidden'
-    }}>
-      <span style={{ fontSize: '16px' }}>🏠</span>
-      {breadcrumb.map((item, index) => (
-        <React.Fragment key={item.id}>
-          {index > 0 && <span style={{ color: '#9ca3af' }}>›</span>}
-          <span style={{
-            color: index === breadcrumb.length - 1 ? '#6366f1' : '#6b7280',
-            fontWeight: index === breadcrumb.length - 1 ? 'bold' : 'normal',
-            fontSize: '13px',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '150px'
-          }}>
-            {item.titre}
-          </span>
-        </React.Fragment>
-      ))}
-    </div>
-  )}
-  
-  {/* Navigation */}
-  {zoomedNodeId && siblings.length > 1 && (
-    <div style={{
-      position: 'absolute',
-      bottom: '20px',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      zIndex: 10,
-      display: 'flex',
-      gap: '10px',
-      background: 'white',
-      padding: '8px',
-      borderRadius: '8px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-    }}>
-      <button
-        onClick={navigateToPrevious}
-        disabled={currentIndex === 0}
-        style={{
-          background: currentIndex === 0 ? '#e5e7eb' : '#6366f1',
-          color: 'white',
-          border: 'none',
-          padding: '8px 16px',
-          borderRadius: '6px',
-          cursor: currentIndex === 0 ? 'not-allowed' : 'pointer',
-          fontWeight: '600',
-          fontSize: '14px'
-        }}
-      >
-        ← Précédent
-      </button>
-      <span style={{
-        padding: '8px 12px',
-        color: '#6b7280',
-        fontSize: '14px',
-        fontWeight: '600'
-      }}>
-        {currentIndex + 1} / {siblings.length}
-      </span>
-      <button
-        onClick={navigateToNext}
-        disabled={currentIndex === siblings.length - 1}
-        style={{
-          background: currentIndex === siblings.length - 1 ? '#e5e7eb' : '#6366f1',
-          color: 'white',
-          border: 'none',
-          padding: '8px 16px',
-          borderRadius: '6px',
-          cursor: currentIndex === siblings.length - 1 ? 'not-allowed' : 'pointer',
-          fontWeight: '600',
-          fontSize: '14px'
-        }}
-      >
-        Suivant →
-      </button>
-    </div>
-  )}
-  
-  {/* Bouton vue globale */}
-  {zoomedNodeId && (
-    <button
-      onClick={() => {
-        setZoomedNodeId(null);
-        setBreadcrumb([]);
-        setTimeout(() => reactFlow.fitView({ duration: 500, padding: 0.2 }), 100);
-      }}
-      style={{
-        position: 'absolute',
-        bottom: '80px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 10,
-        background: '#f59e0b',
-        color: 'white',
-        border: 'none',
-        padding: '10px 20px',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        fontWeight: '600',
-        fontSize: '14px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-      }}
-    >
-      🏠 Vue globale
-    </button>
-  )}
-  
   <div style={{ width: '100%', height: '100%', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
     <ReactFlow
       nodes={nodes}
       edges={edges}
       onNodesChange={handleNodesChange}
       onEdgesChange={onEdgesChange}
-      onNodeClick={onNodeClick}
       fitView
       fitViewOptions={{ padding: 0.2, maxZoom: 1.5 }}
       attributionPosition="bottom-left"
@@ -730,30 +404,14 @@ transition: ‘all 0.2s’
       <Background color="#f3f4f6" gap={16} />
       <Controls />
       <MiniMap 
-        nodeColor={(node) => {
-          if (node.id === zoomedNodeId) return '#fbbf24';
-          return node.style?.background as string || '#6366f1';
-        }}
+        nodeColor={(node) => node.style?.background as string || '#6366f1'}
         maskColor="rgba(0, 0, 0, 0.1)"
-        style={{
-          background: 'white',
-          border: '2px solid #e5e7eb',
-          borderRadius: '8px'
-        }}
       />
     </ReactFlow>
   </div>
 </div>
 ```
 
-);
-};
-
-const MindMap: React.FC<MindMapProps> = (props) => {
-return (
-<ReactFlowProvider>
-<MindMapContent {…props} />
-</ReactFlowProvider>
 );
 };
 
