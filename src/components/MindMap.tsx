@@ -40,67 +40,61 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
   const [colorTheme, setColorTheme] = useState<keyof typeof COLOR_THEMES>('indigo');
   const [zoomedNodeId, setZoomedNodeId] = useState<string | null>(null);
   const [breadcrumb, setBreadcrumb] = useState<NodeInfo[]>([]);
-  const [nodesInfo, setNodesInfo] = useState<Map<string, NodeInfo>>(new Map());
+  const [nodesInfoMap, setNodesInfoMap] = useState<Map<string, NodeInfo>>(new Map());
   const reactFlow = useReactFlow();
   
-  const getColorByLevel = (niveau: number): string => {
+  const getColorByLevel = useCallback((niveau: number): string => {
     const colors = COLOR_THEMES[colorTheme];
     return colors[Math.min(niveau, colors.length - 1)];
-  };
+  }, [colorTheme]);
   
-  const getSizeByLevel = (niveau: number, mode: string) => {
+  const getSizeByLevel = useCallback((niveau: number, currentMode: string) => {
     const sizes = {
       light: [
-        { width: 180, height: 80 },
-        { width: 160, height: 75 },
-        { width: 140, height: 70 },
-        { width: 120, height: 65 },
-        { width: 100, height: 60 },
-        { width: 90, height: 55 },
+        { width: 200, height: 90 },
+        { width: 180, height: 85 },
+        { width: 160, height: 80 },
+        { width: 140, height: 75 },
+        { width: 120, height: 70 },
+        { width: 100, height: 65 },
       ],
       semi: [
-        { width: 260, height: 120 },
-        { width: 220, height: 110 },
-        { width: 180, height: 100 },
-        { width: 150, height: 90 },
-        { width: 130, height: 85 },
-        { width: 110, height: 80 },
+        { width: 280, height: 130 },
+        { width: 240, height: 120 },
+        { width: 200, height: 110 },
+        { width: 170, height: 100 },
+        { width: 140, height: 90 },
+        { width: 120, height: 85 },
       ],
       full: [
-        { width: 320, height: 150 },
-        { width: 280, height: 140 },
-        { width: 240, height: 130 },
-        { width: 200, height: 120 },
-        { width: 170, height: 110 },
-        { width: 150, height: 100 },
+        { width: 350, height: 160 },
+        { width: 300, height: 150 },
+        { width: 260, height: 140 },
+        { width: 220, height: 130 },
+        { width: 180, height: 120 },
+        { width: 160, height: 110 },
       ],
     };
     
-    const sizeArray = sizes[mode as keyof typeof sizes];
+    const sizeArray = sizes[currentMode as keyof typeof sizes];
     return sizeArray[Math.min(niveau, sizeArray.length - 1)];
-  };
+  }, []);
   
-  // Fonction de clic sur un nœud
-  const onNodeClick = useCallback((event: any, node: Node) => {
-    event.stopPropagation();
-    
-    if (zoomedNodeId === node.id) {
-      // Dézoom
+  const handleNodeClickInternal = useCallback((nodeId: string) => {
+    if (zoomedNodeId === nodeId) {
       setZoomedNodeId(null);
       setBreadcrumb([]);
       setTimeout(() => {
         reactFlow.fitView({ duration: 500, padding: 0.2 });
       }, 100);
     } else {
-      // Zoom
-      setZoomedNodeId(node.id);
+      setZoomedNodeId(nodeId);
       
-      // Construire breadcrumb
       const path: NodeInfo[] = [];
-      let currentId: string | null = node.id;
+      let currentId: string | null = nodeId;
       
       while (currentId) {
-        const info = nodesInfo.get(currentId);
+        const info = nodesInfoMap.get(currentId);
         if (info) {
           path.unshift(info);
           currentId = info.parentId;
@@ -111,15 +105,14 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
       
       setBreadcrumb(path);
       
-      // Centrer sur le nœud
-      const info = nodesInfo.get(node.id);
+      const info = nodesInfoMap.get(nodeId);
       if (info) {
         setTimeout(() => {
           reactFlow.setCenter(info.x + 100, info.y + 50, { zoom: 1.2, duration: 500 });
         }, 100);
       }
     }
-  }, [zoomedNodeId, nodesInfo, reactFlow]);
+  }, [zoomedNodeId, nodesInfoMap, reactFlow]);
   
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     if (!structure) return { nodes: [], edges: [] };
@@ -130,19 +123,18 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
     let nodeId = 0;
     
     const getHorizontalGap = (niveau: number) => {
-      if (niveau <= 1) return 100;
-      if (niveau === 2) return 80;
-      if (niveau === 3) return 50;
-      return 30;
+      if (niveau <= 1) return 120;
+      if (niveau === 2) return 100;
+      if (niveau === 3) return 60;
+      return 40;
     };
     
-    const verticalGap = 250;
+    const verticalGap = 280;
     
     function createNode(noeud: any, x: number, y: number, niveau: number, parentId: string | null): string {
       const currentId = `node-${nodeId++}`;
       const { width: nodeWidth, height: nodeHeight } = getSizeByLevel(niveau, mode);
       
-      // Stocker les infos
       infoMap.set(currentId, {
         id: currentId,
         titre: noeud.titre,
@@ -167,8 +159,8 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
         contentToShow += '...';
       }
       
-      const titleSize = niveau === 0 ? '15px' : niveau === 1 ? '13px' : niveau === 2 ? '12px' : '11px';
-      const contentSize = niveau === 0 ? '11px' : niveau === 1 ? '10px' : '9px';
+      const titleSize = niveau === 0 ? '16px' : niveau === 1 ? '15px' : niveau === 2 ? '14px' : '13px';
+      const contentSize = niveau === 0 ? '12px' : niveau === 1 ? '11px' : '10px';
       
       nodes.push({
         id: currentId,
@@ -185,14 +177,14 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              padding: niveau === 0 ? '12px' : niveau === 1 ? '10px' : '8px',
+              padding: niveau === 0 ? '16px' : niveau === 1 ? '14px' : '12px',
               boxSizing: 'border-box',
               cursor: 'pointer',
             }}>
               <div style={{ 
                 fontWeight: niveau <= 2 ? 'bold' : '600',
                 fontSize: titleSize,
-                marginBottom: contentToShow ? '4px' : '0',
+                marginBottom: contentToShow ? '6px' : '0',
                 width: '100%',
                 textAlign: 'center',
                 overflow: 'hidden',
@@ -207,7 +199,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
                 <div style={{ 
                   fontSize: contentSize,
                   color: niveau === 0 ? '#e0e7ff' : '#4b5563',
-                  lineHeight: '1.2',
+                  lineHeight: '1.3',
                   width: '100%',
                   textAlign: 'center',
                   overflow: 'hidden',
@@ -225,14 +217,14 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
         style: {
           background: getColorByLevel(niveau),
           color: niveau === 0 ? 'white' : '#1f2937',
-          border: `2px solid ${COLOR_THEMES[colorTheme][0]}`,
-          borderRadius: niveau === 0 ? '10px' : niveau === 1 ? '9px' : '8px',
-          fontSize: '12px',
+          border: `3px solid ${COLOR_THEMES[colorTheme][0]}`,
+          borderRadius: niveau === 0 ? '12px' : niveau === 1 ? '10px' : '8px',
+          fontSize: '13px',
           boxShadow: niveau === 0 
-            ? '0 4px 8px rgba(0,0,0,0.15)' 
+            ? '0 6px 12px rgba(0,0,0,0.15)' 
             : niveau === 1 
-              ? '0 3px 6px rgba(0,0,0,0.1)'
-              : '0 2px 4px rgba(0,0,0,0.08)',
+              ? '0 4px 8px rgba(0,0,0,0.12)'
+              : '0 2px 6px rgba(0,0,0,0.08)',
           width: `${nodeWidth}px`,
           height: `${nodeHeight}px`,
           padding: 0,
@@ -278,7 +270,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
           animated: false,
           style: { 
             stroke: getColorByLevel(niveau - 1), 
-            strokeWidth: 2 
+            strokeWidth: 3 
           },
         });
       }
@@ -354,7 +346,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
           animated: false,
           style: { 
             stroke: getColorByLevel(niveau - 1), 
-            strokeWidth: 2 
+            strokeWidth: 3 
           },
         });
       }
@@ -384,22 +376,24 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
     const startX = Math.max(800, treeWidth / 2 + 200);
     buildTree(structure, null, 0, startX, 50);
     
-    // Sauvegarder la map
-    setNodesInfo(infoMap);
+    setNodesInfoMap(infoMap);
     
     return { nodes, edges };
-  }, [structure, mode, colorTheme]);
+  }, [structure, mode, colorTheme, getColorByLevel, getSizeByLevel]);
   
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [customPositions, setCustomPositions] = useState<Map<string, {x: number, y: number}>>(new Map());
   
-  // Appliquer le style zoom
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    handleNodeClickInternal(node.id);
+  }, [handleNodeClickInternal]);
+  
   useEffect(() => {
     setNodes((nds) =>
       nds.map((node) => {
         const isZoomed = node.id === zoomedNodeId;
-        const shouldShow = !zoomedNodeId || isRelatedNode(node.id, zoomedNodeId, nodesInfo);
+        const shouldShow = !zoomedNodeId || isRelatedNode(node.id, zoomedNodeId, nodesInfoMap);
         
         return {
           ...node,
@@ -417,13 +411,11 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
         };
       })
     );
-  }, [zoomedNodeId, nodesInfo, setNodes]);
+  }, [zoomedNodeId, nodesInfoMap, setNodes, getColorByLevel]);
   
-  // Vérifier si un nœud est lié
   function isRelatedNode(nodeId: string, zoomedId: string, infoMap: Map<string, NodeInfo>): boolean {
     if (nodeId === zoomedId) return true;
     
-    // Parent
     let current: string | null = zoomedId;
     while (current) {
       if (current === nodeId) return true;
@@ -431,7 +423,6 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
       current = info?.parentId || null;
     }
     
-    // Enfant
     const checkChild = (id: string): boolean => {
       if (id === zoomedId) return true;
       const children = Array.from(infoMap.values()).filter(n => n.parentId === id);
@@ -441,40 +432,22 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
     return checkChild(nodeId);
   }
   
-  // Navigation entre frères
   const getSiblings = useCallback(() => {
     if (!zoomedNodeId) return [];
     
-    const current = nodesInfo.get(zoomedNodeId);
+    const current = nodesInfoMap.get(zoomedNodeId);
     if (!current || !current.parentId) return [];
     
-    return Array.from(nodesInfo.values())
+    return Array.from(nodesInfoMap.values())
       .filter(n => n.parentId === current.parentId)
       .sort((a, b) => a.x - b.x);
-  }, [zoomedNodeId, nodesInfo]);
+  }, [zoomedNodeId, nodesInfoMap]);
   
   const navigateToPrevious = () => {
     const siblings = getSiblings();
     const idx = siblings.findIndex(s => s.id === zoomedNodeId);
     if (idx > 0) {
-      const target = siblings[idx - 1];
-      setZoomedNodeId(target.id);
-      
-      // Breadcrumb
-      const path: NodeInfo[] = [];
-      let currentId: string | null = target.id;
-      while (currentId) {
-        const info = nodesInfo.get(currentId);
-        if (info) {
-          path.unshift(info);
-          currentId = info.parentId;
-        } else break;
-      }
-      setBreadcrumb(path);
-      
-      setTimeout(() => {
-        reactFlow.setCenter(target.x + 100, target.y + 50, { zoom: 1.2, duration: 500 });
-      }, 100);
+      handleNodeClickInternal(siblings[idx - 1].id);
     }
   };
   
@@ -482,24 +455,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
     const siblings = getSiblings();
     const idx = siblings.findIndex(s => s.id === zoomedNodeId);
     if (idx < siblings.length - 1) {
-      const target = siblings[idx + 1];
-      setZoomedNodeId(target.id);
-      
-      // Breadcrumb
-      const path: NodeInfo[] = [];
-      let currentId: string | null = target.id;
-      while (currentId) {
-        const info = nodesInfo.get(currentId);
-        if (info) {
-          path.unshift(info);
-          currentId = info.parentId;
-        } else break;
-      }
-      setBreadcrumb(path);
-      
-      setTimeout(() => {
-        reactFlow.setCenter(target.x + 100, target.y + 50, { zoom: 1.2, duration: 500 });
-      }, 100);
+      handleNodeClickInternal(siblings[idx + 1].id);
     }
   };
   
@@ -533,37 +489,36 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
   
   return (
     <div style={{ position: 'relative', height: '100%' }}>
-      {/* Sélecteur couleur */}
       <div style={{ 
         position: 'absolute', 
         top: '10px', 
         right: '10px', 
         zIndex: 10,
         display: 'flex',
-        gap: '6px',
+        gap: '8px',
         background: 'white',
-        padding: '6px',
-        borderRadius: '8px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        padding: '8px',
+        borderRadius: '10px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
       }}>
         {Object.keys(COLOR_THEMES).map((theme) => (
           <button
             key={theme}
             onClick={() => setColorTheme(theme as keyof typeof COLOR_THEMES)}
             style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '6px',
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
               border: colorTheme === theme ? '3px solid #1f2937' : '2px solid #e5e7eb',
               background: COLOR_THEMES[theme as keyof typeof COLOR_THEMES][0],
               cursor: 'pointer',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              boxShadow: colorTheme === theme ? '0 2px 6px rgba(0,0,0,0.15)' : 'none'
             }}
           />
         ))}
       </div>
       
-      {/* Breadcrumb */}
       {breadcrumb.length > 0 && (
         <div style={{
           position: 'absolute',
@@ -572,8 +527,8 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
           zIndex: 10,
           background: 'white',
           padding: '10px 16px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          borderRadius: '10px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
@@ -600,7 +555,6 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
         </div>
       )}
       
-      {/* Navigation */}
       {zoomedNodeId && siblings.length > 1 && (
         <div style={{
           position: 'absolute',
@@ -612,8 +566,8 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
           gap: '10px',
           background: 'white',
           padding: '8px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          borderRadius: '10px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
         }}>
           <button
             onClick={navigateToPrevious}
@@ -622,8 +576,8 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
               background: currentIndex === 0 ? '#e5e7eb' : '#6366f1',
               color: 'white',
               border: 'none',
-              padding: '8px 16px',
-              borderRadius: '6px',
+              padding: '10px 18px',
+              borderRadius: '8px',
               cursor: currentIndex === 0 ? 'not-allowed' : 'pointer',
               fontWeight: '600',
               fontSize: '14px'
@@ -632,7 +586,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
             ← Précédent
           </button>
           <span style={{
-            padding: '8px 12px',
+            padding: '10px 16px',
             color: '#6b7280',
             fontSize: '14px',
             fontWeight: '600'
@@ -646,8 +600,8 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
               background: currentIndex === siblings.length - 1 ? '#e5e7eb' : '#6366f1',
               color: 'white',
               border: 'none',
-              padding: '8px 16px',
-              borderRadius: '6px',
+              padding: '10px 18px',
+              borderRadius: '8px',
               cursor: currentIndex === siblings.length - 1 ? 'not-allowed' : 'pointer',
               fontWeight: '600',
               fontSize: '14px'
@@ -658,36 +612,31 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
         </div>
       )}
       
-      {/* Bouton vue globale */}
       {zoomedNodeId && (
         <button
-          onClick={() => {
-            setZoomedNodeId(null);
-            setBreadcrumb([]);
-            setTimeout(() => reactFlow.fitView({ duration: 500, padding: 0.2 }), 100);
-          }}
+          onClick={() => handleNodeClickInternal(zoomedNodeId)}
           style={{
             position: 'absolute',
-            bottom: '80px',
+            bottom: '90px',
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 10,
             background: '#f59e0b',
             color: 'white',
             border: 'none',
-            padding: '10px 20px',
-            borderRadius: '8px',
+            padding: '12px 24px',
+            borderRadius: '10px',
             cursor: 'pointer',
             fontWeight: '600',
             fontSize: '14px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
           }}
         >
           🏠 Vue globale
         </button>
       )}
       
-      <div style={{ width: '100%', height: '100%', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+      <div style={{ width: '100%', height: '100%', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -702,7 +651,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
           nodesDraggable={true}
           nodesConnectable={false}
         >
-          <Background color="#f3f4f6" gap={16} />
+          <Background color="#f3f4f6" gap={20} size={1} />
           <Controls />
           <MiniMap 
             nodeColor={(node) => {
@@ -713,7 +662,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
             style={{
               background: 'white',
               border: '2px solid #e5e7eb',
-              borderRadius: '8px'
+              borderRadius: '10px'
             }}
           />
         </ReactFlow>
