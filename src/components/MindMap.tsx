@@ -68,13 +68,16 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
   const [drawingPaths, setDrawingPaths] = useState<DrawingPath[]>([]);
   const [currentPath, setCurrentPath] = useState<{ x: number; y: number }[]>([]);
   const [zoomedNodeId, setZoomedNodeId] = useState<string | null>(null);
+  const [lastClickedNodeId, setLastClickedNodeId] = useState<string | null>(null);
+  const [lastClickTime, setLastClickTime] = useState(0);
   const [nodesInfoMap, setNodesInfoMap] = useState<Map<string, NodeInfo>>(new Map());
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const [nodeColors, setNodeColors] = useState<Map<string, string>>(new Map());
   const [nodeNotes, setNodeNotes] = useState<Map<string, string>>(new Map());
   const reactFlow = useReactFlow();
-  const { zoom } = useViewport();
+  const { zoom, x: viewportX, y: viewportY } = useViewport();
   const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   const getColorByLevel = useCallback((niveau: number, nodeId?: string): string => {
     if (nodeId && nodeColors.has(nodeId)) {
@@ -136,78 +139,92 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
   }, []);
   
   const handleNodeClickInternal = useCallback((nodeId: string) => {
-    if (zoomedNodeId === nodeId) {
-      setZoomedNodeId(null);
-      setTimeout(() => {
-        reactFlow.fitView({ duration: 500, padding: 0.15, maxZoom: 0.9 });
-      }, 100);
-    } else {
-      setZoomedNodeId(nodeId);
-      
-      const info = nodesInfoMap.get(nodeId);
-      if (info) {
-        const allDescendants = info.allDescendantsIds;
-        let minX = info.x;
-        let maxX = info.x + info.width;
-        let minY = info.y;
-        let maxY = info.y + info.height;
+    const currentTime = Date.now();
+    const timeSinceLastClick = currentTime - lastClickTime;
+    
+    // Si c'est le même noeud et moins de 500ms depuis le dernier clic = 2e clic
+    if (lastClickedNodeId === nodeId && timeSinceLastClick < 500) {
+      // 2e clic = afficher le menu EDIT
+      const nodeInfo = nodesInfoMap.get(nodeId);
+      if (nodeInfo) {
+        const screenX = (nodeInfo.x + nodeInfo.width / 2) * zoom + viewportX;
+        const screenY = (nodeInfo.y + nodeInfo.height) * zoom + viewportY + 10;
         
-        allDescendants.forEach(descId => {
-          const descInfo = nodesInfoMap.get(descId);
-          if (descInfo) {
-            minX = Math.min(minX, descInfo.x);
-            maxX = Math.max(maxX, descInfo.x + descInfo.width);
-            minY = Math.min(minY, descInfo.y);
-            maxY = Math.max(maxY, descInfo.y + descInfo.height);
-          }
+        setContextMenu({
+          nodeId: nodeId,
+          x: screenX,
+          y: screenY
         });
-        
-        const padding = 50;
-        minX -= padding;
-        maxX += padding;
-        minY -= padding;
-        maxY += padding;
-        
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
-        const width = maxX - minX;
-        const height = maxY - minY;
-        
-        const windowWidth = window.innerWidth;
-        const windowHeight = window.innerHeight - 150;
-        const zoomX = (windowWidth * 0.9) / width;
-        const zoomY = (windowHeight * 0.9) / height;
-        const targetZoom = Math.min(zoomX, zoomY, 1.5);
-        
-        setTimeout(() => {
-          reactFlow.setCenter(centerX, centerY, { zoom: targetZoom, duration: 500 });
-        }, 100);
       }
+      setLastClickedNodeId(null);
+      setLastClickTime(0);
+    } else {
+      // 1er clic = zoom
+      if (zoomedNodeId === nodeId) {
+        setZoomedNodeId(null);
+        setTimeout(() => {
+          reactFlow.fitView({ duration: 500, padding: 0.15, maxZoom: 0.9 });
+        }, 100);
+      } else {
+        setZoomedNodeId(nodeId);
+        
+        const info = nodesInfoMap.get(nodeId);
+        if (info) {
+          const allDescendants = info.allDescendantsIds;
+          let minX = info.x;
+          let maxX = info.x + info.width;
+          let minY = info.y;
+          let maxY = info.y + info.height;
+          
+          allDescendants.forEach(descId => {
+            const descInfo = nodesInfoMap.get(descId);
+            if (descInfo) {
+              minX = Math.min(minX, descInfo.x);
+              maxX = Math.max(maxX, descInfo.x + descInfo.width);
+              minY = Math.min(minY, descInfo.y);
+              maxY = Math.max(maxY, descInfo.y + descInfo.height);
+            }
+          });
+          
+          const padding = 50;
+          minX -= padding;
+          maxX += padding;
+          minY -= padding;
+          maxY += padding;
+          
+          const centerX = (minX + maxX) / 2;
+          const centerY = (minY + maxY) / 2;
+          const width = maxX - minX;
+          const height = maxY - minY;
+          
+          const windowWidth = window.innerWidth;
+          const windowHeight = window.innerHeight - 150;
+          const zoomX = (windowWidth * 0.9) / width;
+          const zoomY = (windowHeight * 0.9) / height;
+          const targetZoom = Math.min(zoomX, zoomY, 1.5);
+          
+          setTimeout(() => {
+            reactFlow.setCenter(centerX, centerY, { zoom: targetZoom, duration: 500 });
+          }, 100);
+        }
+      }
+      
+      setLastClickedNodeId(nodeId);
+      setLastClickTime(currentTime);
     }
-  }, [zoomedNodeId, nodesInfoMap, reactFlow]);
-  
-  const handleNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
-    event.stopPropagation();
-    const rect = (event.target as HTMLElement).getBoundingClientRect();
-    setContextMenu({
-      nodeId: node.id,
-      x: rect.left + rect.width / 2,
-      y: rect.bottom + 10
-    });
-  }, []);
+  }, [zoomedNodeId, nodesInfoMap, reactFlow, lastClickedNodeId, lastClickTime, zoom, viewportX, viewportY]);
   
   const handleDrawStart = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing) return;
     
-    const svg = svgRef.current;
-    if (!svg) return;
+    e.preventDefault();
+    e.stopPropagation();
     
-    const rect = svg.getBoundingClientRect();
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     
-    const x = (clientX - rect.left) / zoom;
-    const y = (clientY - rect.top) / zoom;
+    const x = (clientX - viewportX) / zoom;
+    const y = (clientY - viewportY) / zoom;
     
     setCurrentPath([{ x, y }]);
   };
@@ -215,15 +232,14 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
   const handleDrawMove = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing || currentPath.length === 0) return;
     
-    const svg = svgRef.current;
-    if (!svg) return;
+    e.preventDefault();
+    e.stopPropagation();
     
-    const rect = svg.getBoundingClientRect();
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     
-    const x = (clientX - rect.left) / zoom;
-    const y = (clientY - rect.top) / zoom;
+    const x = (clientX - viewportX) / zoom;
+    const y = (clientY - viewportY) / zoom;
     
     setCurrentPath(prev => [...prev, { x, y }]);
   };
@@ -670,56 +686,59 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
   const currentIndex = siblings.findIndex(s => s.id === zoomedNodeId);
   
   return (
-    <div style={{ position: 'relative', height: '100%', width: '100%', overflow: 'hidden' }}>
-      <svg
-        ref={svgRef}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          pointerEvents: isDrawing ? 'auto' : 'none',
-          zIndex: isDrawing ? 1000 : 1,
-        }}
-        onMouseDown={handleDrawStart}
-        onMouseMove={handleDrawMove}
-        onMouseUp={handleDrawEnd}
-        onMouseLeave={handleDrawEnd}
-        onTouchStart={handleDrawStart}
-        onTouchMove={handleDrawMove}
-        onTouchEnd={handleDrawEnd}
-      >
-        {drawingPaths.map((path, index) => (
-          <path
-            key={index}
-            d={`M ${path.points.map(p => `${p.x},${p.y}`).join(' L ')}`}
-            stroke={path.color}
-            strokeWidth={path.width}
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity={path.tool === 'highlighter' ? 0.4 : 1}
-          />
-        ))}
-        {currentPath.length > 0 && (
-          <path
-            d={`M ${currentPath.map(p => `${p.x},${p.y}`).join(' L ')}`}
-            stroke={selectedDrawColor}
-            strokeWidth={selectedTool === 'highlighter' ? 20 : selectedTool === 'pencil' ? 2 : 3}
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity={selectedTool === 'highlighter' ? 0.4 : 1}
-          />
-        )}
-      </svg>
+    <div ref={containerRef} style={{ position: 'relative', height: '100%', width: '100%', overflow: 'hidden' }}>
+      {isDrawing && (
+        <svg
+          ref={svgRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'auto',
+            zIndex: 1000,
+            cursor: 'crosshair',
+          }}
+          onMouseDown={handleDrawStart}
+          onMouseMove={handleDrawMove}
+          onMouseUp={handleDrawEnd}
+          onMouseLeave={handleDrawEnd}
+          onTouchStart={handleDrawStart}
+          onTouchMove={handleDrawMove}
+          onTouchEnd={handleDrawEnd}
+        >
+          {drawingPaths.map((path, index) => (
+            <path
+              key={index}
+              d={`M ${path.points.map(p => `${p.x * zoom + viewportX},${p.y * zoom + viewportY}`).join(' L ')}`}
+              stroke={path.color}
+              strokeWidth={path.width}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={path.tool === 'highlighter' ? 0.4 : 1}
+            />
+          ))}
+          {currentPath.length > 0 && (
+            <path
+              d={`M ${currentPath.map(p => `${p.x * zoom + viewportX},${p.y * zoom + viewportY}`).join(' L ')}`}
+              stroke={selectedDrawColor}
+              strokeWidth={selectedTool === 'highlighter' ? 20 : selectedTool === 'pencil' ? 2 : 3}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={selectedTool === 'highlighter' ? 0.4 : 1}
+            />
+          )}
+        </svg>
+      )}
       
       <div style={{ 
         position: 'absolute', 
         top: '10px', 
         left: '10px', 
-        zIndex: 10,
+        zIndex: 100,
       }}>
         <MiniMap 
           nodeColor={(node) => node.style?.background as string || '#6366f1'}
@@ -738,7 +757,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
         position: 'absolute', 
         top: '10px', 
         right: '10px', 
-        zIndex: 10,
+        zIndex: 100,
         display: 'flex',
         gap: '8px'
       }}>
@@ -775,7 +794,8 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
             display: 'flex',
             flexDirection: 'column',
             gap: '6px',
-            minWidth: '150px'
+            minWidth: '150px',
+            zIndex: 101
           }}>
             <button
               onClick={() => {
@@ -842,6 +862,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
                       setSelectedDrawColor(color);
                       setIsDrawing(true);
                       setShowDrawMenu(false);
+                      setShowDrawColors(false);
                     }}
                     style={{
                       width: '28px',
@@ -857,23 +878,44 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
             )}
             
             {isDrawing && (
-              <button
-                onClick={() => {
-                  setIsDrawing(false);
-                  setShowDrawMenu(false);
-                }}
-                style={{
-                  padding: '8px 12px',
-                  border: 'none',
-                  borderRadius: '6px',
-                  background: '#ef4444',
-                  color: 'white',
-                  cursor: 'pointer',
-                  fontWeight: '600'
-                }}
-              >
-                ❌ Arrêter dessin
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    setDrawingPaths([]);
+                    setCurrentPath([]);
+                  }}
+                  style={{
+                    padding: '8px 12px',
+                    border: 'none',
+                    borderRadius: '6px',
+                    background: '#f59e0b',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    marginTop: '8px'
+                  }}
+                >
+                  🗑️ Tout effacer
+                </button>
+                <button
+                  onClick={() => {
+                    setIsDrawing(false);
+                    setShowDrawMenu(false);
+                    setShowDrawColors(false);
+                  }}
+                  style={{
+                    padding: '8px 12px',
+                    border: 'none',
+                    borderRadius: '6px',
+                    background: '#ef4444',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  ❌ Arrêter
+                </button>
+              </>
             )}
           </div>
         )}
@@ -904,7 +946,8 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
             borderRadius: '8px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             display: 'flex',
-            gap: '6px'
+            gap: '6px',
+            zIndex: 101
           }}>
             {Object.keys(COLOR_THEMES).map((theme) => (
               <button
@@ -1008,6 +1051,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
                     newMap.set(contextMenu.nodeId, note);
                     return newMap;
                   });
+                  alert('Note ajoutée ! (Fonctionnalité sous-case à implémenter)');
                 }
                 setContextMenu(null);
               }}
@@ -1037,7 +1081,9 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
                 cursor: 'pointer',
                 borderRadius: '4px',
                 fontSize: '14px',
-                color: '#dc2626'
+                color: '#dc2626',
+                marginTop: '4px',
+                borderTop: '1px solid #e5e7eb'
               }}
               onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
@@ -1118,7 +1164,6 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
           onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
-          onNodeDoubleClick={handleNodeDoubleClick}
           fitView={false}
           attributionPosition="bottom-left"
           minZoom={0.1}
