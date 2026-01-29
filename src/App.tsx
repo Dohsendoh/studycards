@@ -172,7 +172,7 @@ async function extraireTexteURL(url: string): Promise<string> {
   }
 }
 
-const Sidebar = ({ activeView, setActiveView, isOpen, setIsOpen }: any) => {
+const Sidebar = ({ activeView, setActiveView, isOpen, setIsOpen, setProjetActif }: any) => {
   const { t } = useLanguage();
   const menuItems = [
     { id: 'projets', label: t('myProjects'), icon: FolderOpen },
@@ -218,6 +218,9 @@ const Sidebar = ({ activeView, setActiveView, isOpen, setIsOpen }: any) => {
               key={item.id}
               onClick={() => {
                 setActiveView(item.id);
+                if (item.id === 'nouveau') {
+                  setProjetActif(null);
+                }
                 setIsOpen(false);
               }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition-all ${
@@ -726,11 +729,19 @@ function App() {
           activeView={activeView} 
           setActiveView={setActiveView} 
           isOpen={menuOpen} 
-          setIsOpen={setMenuOpen} 
+          setIsOpen={setMenuOpen}
+          setProjetActif={setProjetActif}
         />
         
         {activeView === 'nouveau' && (
           <NouveauProjet setActiveView={setActiveView} setProjetActif={setProjetActif} />
+        )}
+        
+        {activeView === 'projets' && (
+          <div style={{ padding: '40px', textAlign: 'center' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Mes Projets</h2>
+            <p style={{ color: '#6b7280' }}>Aucun projet pour le moment</p>
+          </div>
         )}
         
         {activeView === 'mindmap' && projetActif && (
