@@ -561,7 +561,8 @@ const MindMapView = ({ projetActif, activeTab, setActiveTab, menuOpen, setMenuOp
         padding: '12px 20px',
         background: 'white',
         borderBottom: '1px solid #e5e7eb',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        zIndex: 20
       }}>
         <div style={{
           display: 'flex',
@@ -660,14 +661,14 @@ const MindMapView = ({ projetActif, activeTab, setActiveTab, menuOpen, setMenuOp
         
         {activeTab === 'quiz' && (
           <div style={{ padding: '40px', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Quizz</h2>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>{t('quiz')}</h2>
             <p style={{ color: '#6b7280' }}>À implémenter</p>
           </div>
         )}
         
         {activeTab === 'memory' && (
           <div style={{ padding: '40px', overflow: 'auto', height: '100%' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px' }}>Memory Cards</h2>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px' }}>{t('memoryCards')}</h2>
             {projetActif?.memoryCards && projetActif.memoryCards.length > 0 ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
                 {projetActif.memoryCards.map((card: MemoryCard) => (
@@ -689,7 +690,8 @@ const MindMapView = ({ projetActif, activeTab, setActiveTab, menuOpen, setMenuOp
         display: 'flex',
         borderTop: '1px solid #e5e7eb',
         background: 'white',
-        boxShadow: '0 -2px 8px rgba(0,0,0,0.05)'
+        boxShadow: '0 -2px 8px rgba(0,0,0,0.05)',
+        zIndex: 20
       }}>
         <button
           onClick={() => setActiveTab('mindmap')}
@@ -822,14 +824,14 @@ function App() {
         
         {activeView === 'statistiques' && (
           <div style={{ padding: '40px', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Statistiques</h2>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>{t('statistics')}</h2>
             <p style={{ color: '#6b7280' }}>À implémenter</p>
           </div>
         )}
         
         {activeView === 'parametres' && (
           <div style={{ padding: '40px', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Paramètres</h2>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>{t('settings')}</h2>
             <p style={{ color: '#6b7280' }}>À implémenter</p>
           </div>
         )}
