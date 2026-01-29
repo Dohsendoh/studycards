@@ -199,6 +199,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
       
       return Math.max(width, totalChildWidth + gaps);
     }
+    
     function createNode(noeud: any, x: number, y: number, niveau: number, parentId: string | null, nodeWidth: number): string {
       const currentId = `node-${nodeId++}`;
       const { width: defaultWidth, height: nodeHeight } = getSizeByLevel(niveau, mode);
