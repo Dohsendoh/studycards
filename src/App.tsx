@@ -21,6 +21,7 @@ const translations = {
     newProject: 'Nouveau Projet',
     statistics: 'Statistiques',
     settings: 'Paramètres',
+    organizeStudy: 'Organisez et révisez',
     cancel: 'Annuler',
     language: 'Langue',
     uploadFiles: 'Uploader des fichiers',
@@ -37,7 +38,7 @@ const translations = {
     semiMode: 'Résumé',
     lightMode: 'Léger',
     memoryCards: 'Memory Cards',
-    synthesis: 'Synthèse',
+    mindmap: 'Mind Map',
     quiz: 'Quizz',
   },
   en: {
@@ -47,6 +48,7 @@ const translations = {
     newProject: 'New Project',
     statistics: 'Statistics',
     settings: 'Settings',
+    organizeStudy: 'Organize and review',
     cancel: 'Cancel',
     language: 'Language',
     uploadFiles: 'Upload files',
@@ -63,7 +65,7 @@ const translations = {
     semiMode: 'Summary',
     lightMode: 'Light',
     memoryCards: 'Memory Cards',
-    synthesis: 'Synthesis',
+    mindmap: 'Mind Map',
     quiz: 'Quiz',
   }
 };
@@ -236,6 +238,44 @@ const Sidebar = ({ activeView, setActiveView, isOpen, setIsOpen, setProjetActif 
         </nav>
       </div>
     </>
+  );
+};
+
+const AccueilProjets = ({ setActiveView }: any) => {
+  const { t } = useLanguage();
+
+  return (
+    <div style={{ padding: '32px' }}>
+      <div style={{ marginBottom: '32px' }}>
+        <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1f2937', marginBottom: '8px' }}>{t('myProjects')}</h2>
+        <p style={{ color: '#6b7280' }}>{t('organizeStudy')}</p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
+        <div
+          onClick={() => setActiveView('nouveau')}
+          style={{
+            background: 'linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%)',
+            borderRadius: '12px',
+            border: '2px dashed #6366f1',
+            padding: '48px 24px',
+            textAlign: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.3s',
+            minHeight: '200px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <div style={{ width: '48px', height: '48px', background: '#e0e7ff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
+            <Plus size={24} style={{ color: '#6366f1' }} />
+          </div>
+          <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937' }}>{t('newProject')}</h3>
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -441,7 +481,7 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => setActiveView('projets')}
                 style={{
                   padding: '12px 24px',
                   border: '1px solid #d1d5db',
@@ -618,13 +658,6 @@ const MindMapView = ({ projetActif, activeTab, setActiveTab, menuOpen, setMenuOp
           <MindMap structure={projetActif.structure} mode={mode} />
         )}
         
-        {activeTab === 'synthesis' && (
-          <div style={{ padding: '40px', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Synthèse</h2>
-            <p style={{ color: '#6b7280' }}>À implémenter</p>
-          </div>
-        )}
-        
         {activeTab === 'quiz' && (
           <div style={{ padding: '40px', textAlign: 'center' }}>
             <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Quizz</h2>
@@ -659,20 +692,20 @@ const MindMapView = ({ projetActif, activeTab, setActiveTab, menuOpen, setMenuOp
         boxShadow: '0 -2px 8px rgba(0,0,0,0.05)'
       }}>
         <button
-          onClick={() => setActiveTab('synthesis')}
+          onClick={() => setActiveTab('mindmap')}
           style={{
             flex: 1,
             padding: '16px',
             border: 'none',
-            background: activeTab === 'synthesis' ? '#6366f1' : 'white',
-            color: activeTab === 'synthesis' ? 'white' : '#6b7280',
+            background: activeTab === 'mindmap' ? '#6366f1' : 'white',
+            color: activeTab === 'mindmap' ? 'white' : '#6b7280',
             fontSize: '14px',
             fontWeight: '600',
             cursor: 'pointer',
             transition: 'all 0.2s'
           }}
         >
-          {t('synthesis')}
+          {t('mindmap')}
         </button>
         <button
           onClick={() => setActiveTab('quiz')}
@@ -715,7 +748,7 @@ const MindMapView = ({ projetActif, activeTab, setActiveTab, menuOpen, setMenuOp
 
 function App() {
   const [lang, setLang] = useState('fr');
-  const [activeView, setActiveView] = useState('nouveau');
+  const [activeView, setActiveView] = useState('projets');
   const [projetActif, setProjetActif] = useState<Projet | null>(null);
   const [activeTab, setActiveTab] = useState('mindmap');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -725,6 +758,52 @@ function App() {
   return (
     <LanguageContext.Provider value={{ lang, setLang, t }}>
       <div style={{ height: '100vh', overflow: 'hidden', background: '#f9fafb' }}>
+        {activeView !== 'mindmap' && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 20px',
+            background: 'white',
+            borderBottom: '1px solid #e5e7eb',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+          }}>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '8px'
+              }}
+            >
+              <Menu size={24} style={{ color: '#6b7280' }} />
+            </button>
+            
+            <h1 style={{
+              fontSize: '18px',
+              fontWeight: 'bold',
+              color: '#1f2937',
+              flex: 1,
+              textAlign: 'center'
+            }}>
+              {t('appName')}
+            </h1>
+            
+            <button
+              onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '8px'
+              }}
+            >
+              <Globe size={24} style={{ color: '#6b7280' }} />
+            </button>
+          </div>
+        )}
+        
         <Sidebar 
           activeView={activeView} 
           setActiveView={setActiveView} 
@@ -733,14 +812,25 @@ function App() {
           setProjetActif={setProjetActif}
         />
         
+        {activeView === 'projets' && (
+          <AccueilProjets setActiveView={setActiveView} />
+        )}
+        
         {activeView === 'nouveau' && (
           <NouveauProjet setActiveView={setActiveView} setProjetActif={setProjetActif} />
         )}
         
-        {activeView === 'projets' && (
+        {activeView === 'statistiques' && (
           <div style={{ padding: '40px', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Mes Projets</h2>
-            <p style={{ color: '#6b7280' }}>Aucun projet pour le moment</p>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Statistiques</h2>
+            <p style={{ color: '#6b7280' }}>À implémenter</p>
+          </div>
+        )}
+        
+        {activeView === 'parametres' && (
+          <div style={{ padding: '40px', textAlign: 'center' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Paramètres</h2>
+            <p style={{ color: '#6b7280' }}>À implémenter</p>
           </div>
         )}
         
