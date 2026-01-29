@@ -199,8 +199,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
       
       return Math.max(width, totalChildWidth + gaps);
     }
-
-function createNode(noeud: any, x: number, y: number, niveau: number, parentId: string | null, nodeWidth: number): string {
+    function createNode(noeud: any, x: number, y: number, niveau: number, parentId: string | null, nodeWidth: number): string {
       const currentId = `node-${nodeId++}`;
       const { width: defaultWidth, height: nodeHeight } = getSizeByLevel(niveau, mode);
       const actualWidth = (niveau === 0 || niveau === 1) ? defaultWidth : nodeWidth;
@@ -575,4 +574,329 @@ function createNode(noeud: any, x: number, y: number, niveau: number, parentId: 
             info.y = change.position!.y;
           }
           return newMap;
-                               }
+        });
+      }
+    });
+    onNodesChange(changes);
+  }, [onNodesChange]);
+  
+  useEffect(() => {
+    const updatedNodes = initialNodes.map(node => {
+      const customPos = customPositions.get(node.id);
+      if (customPos) {
+        return { ...node, position: customPos };
+      }
+      return node;
+    });
+    setNodes(updatedNodes);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges, customPositions]);
+  
+  const siblings = getSiblings();
+  const currentIndex = siblings.findIndex(s => s.id === zoomedNodeId);
+  
+  return (
+    <div style={{ position: 'relative', height: '100%', width: '100%', overflow: 'hidden' }}>
+      <div style={{ 
+        position: 'absolute', 
+        top: '10px', 
+        left: '10px', 
+        zIndex: 10,
+      }}>
+        <MiniMap 
+          nodeColor={(node) => node.style?.background as string || '#6366f1'}
+          maskColor="rgba(0, 0, 0, 0.1)"
+          style={{
+            background: 'white',
+            border: '2px solid #e5e7eb',
+            borderRadius: '8px',
+            width: '120px',
+            height: '80px'
+          }}
+        />
+      </div>
+      
+      <div style={{ 
+        position: 'absolute', 
+        top: '10px', 
+        right: '10px', 
+        zIndex: 10,
+      }}>
+        <button
+          onClick={() => setShowColorPicker(!showColorPicker)}
+          style={{
+            width: '36px',
+            height: '36px',
+            borderRadius: '8px',
+            border: '2px solid #e5e7eb',
+            background: COLOR_THEMES[colorTheme][0],
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+          }}
+        />
+        {showColorPicker && (
+          <div style={{
+            position: 'absolute',
+            top: '45px',
+            right: '0',
+            background: 'white',
+            padding: '8px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            display: 'flex',
+            gap: '6px'
+          }}>
+            {Object.keys(COLOR_THEMES).map((theme) => (
+              <button
+                key={theme}
+                onClick={() => {
+                  setColorTheme(theme as keyof typeof COLOR_THEMES);
+                  setShowColorPicker(false);
+                }}
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  border: colorTheme === theme ? '2px solid #1f2937' : '1px solid #e5e7eb',
+                  background: COLOR_THEMES[theme as keyof typeof COLOR_THEMES][0],
+                  cursor: 'pointer',
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+      
+      {contextMenu && (
+        <div style={{
+          position: 'fixed',
+          top: contextMenu.y,
+          left: contextMenu.x,
+          transform: 'translateX(-50%)',
+          background: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+          padding: '8px',
+          zIndex: 1000,
+          minWidth: '200px'
+        }}>
+          <button
+            onClick={() => {
+              alert('Fonction de modification à implémenter');
+              setContextMenu(null);
+            }}
+            style={{
+              width: '100%',
+              padding: '10px',
+              border: 'none',
+              background: 'transparent',
+              textAlign: 'left',
+              cursor: 'pointer',
+              borderRadius: '4px',
+              fontSize: '14px'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+          >
+            ✏️ Modifier le texte
+          </button>
+          <button
+            onClick={() => {
+              setNodes(nds => nds.map(n => 
+                n.id === contextMenu.nodeId ? { ...n, draggable: true } : n
+              ));
+              setContextMenu(null);
+            }}
+            style={{
+              width: '100%',
+              padding: '10px',
+              border: 'none',
+              background: 'transparent',
+              textAlign: 'left',
+              cursor: 'pointer',
+              borderRadius: '4px',
+              fontSize: '14px'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+          >
+            🔓 Déplacer la case
+          </button>
+          <button
+            onClick={() => {
+              const color = prompt('Couleur (hex):');
+              if (color) {
+                setNodeColors(prev => {
+                  const newMap = new Map(prev);
+                  newMap.set(contextMenu.nodeId, color);
+                  return newMap;
+                });
+              }
+              setContextMenu(null);
+            }}
+            style={{
+              width: '100%',
+              padding: '10px',
+              border: 'none',
+              background: 'transparent',
+              textAlign: 'left',
+              cursor: 'pointer',
+              borderRadius: '4px',
+              fontSize: '14px'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+          >
+            🎨 Changer la couleur
+          </button>
+          <button
+            onClick={() => {
+              alert('Fonction de note à implémenter');
+              setContextMenu(null);
+            }}
+            style={{
+              width: '100%',
+              padding: '10px',
+              border: 'none',
+              background: 'transparent',
+              textAlign: 'left',
+              cursor: 'pointer',
+              borderRadius: '4px',
+              fontSize: '14px'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+          >
+            📝 Ajouter une note
+          </button>
+          <button
+            onClick={() => setContextMenu(null)}
+            style={{
+              width: '100%',
+              padding: '10px',
+              border: 'none',
+              background: 'transparent',
+              textAlign: 'left',
+              cursor: 'pointer',
+              borderRadius: '4px',
+              fontSize: '14px',
+              color: '#dc2626'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+          >
+            ❌ Annuler
+          </button>
+        </div>
+      )}
+      
+      {contextMenu && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 999
+          }}
+          onClick={() => setContextMenu(null)}
+        />
+      )}
+      
+      {zoomedNodeId && (
+        <div style={{
+          position: 'absolute',
+          bottom: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 10,
+          display: 'flex',
+          gap: '8px',
+          background: 'white',
+          padding: '6px 10px',
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          fontSize: '13px'
+        }}>
+          <button
+            onClick={navigateToPrevious}
+            disabled={currentIndex === 0}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: currentIndex === 0 ? 'not-allowed' : 'pointer',
+              padding: '4px 8px',
+              fontSize: '13px',
+              opacity: currentIndex === 0 ? 0.4 : 1
+            }}
+          >
+            ← Précédent
+          </button>
+          <button
+            onClick={() => {
+              setZoomedNodeId(null);
+              setTimeout(() => {
+                reactFlow.fitView({ duration: 500, padding: 0.2 });
+              }, 100);
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px 8px',
+              fontSize: '16px'
+            }}
+          >
+            🏠
+          </button>
+          <button
+            onClick={navigateToNext}
+            disabled={currentIndex === siblings.length - 1}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: currentIndex === siblings.length - 1 ? 'not-allowed' : 'pointer',
+              padding: '4px 8px',
+              fontSize: '13px',
+              opacity: currentIndex === siblings.length - 1 ? 0.4 : 1
+            }}
+          >
+            Suivant →
+          </button>
+        </div>
+      )}
+      
+      <div style={{ width: '100%', height: '100%' }}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={onNodeClick}
+          onNodeDoubleClick={handleNodeDoubleClick}
+          fitView={false}
+          attributionPosition="bottom-left"
+          minZoom={0.1}
+          maxZoom={2}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          panOnScroll={true}
+          zoomOnScroll={true}
+          zoomOnPinch={true}
+          panOnDrag={true}
+        >
+          <Background color="#f3f4f6" gap={20} size={1} />
+          <Controls />
+        </ReactFlow>
+      </div>
+    </div>
+  );
+};
+
+const MindMap: React.FC<MindMapProps> = (props) => {
+  return (
+    <ReactFlowProvider>
+      <MindMapContent {...props} />
+    </ReactFlowProvider>
+  );
+};
+
+export default MindMap;
