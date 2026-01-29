@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -75,9 +75,17 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
   const [nodeColors, setNodeColors] = useState<Map<string, string>>(new Map());
   const [nodeNotes, setNodeNotes] = useState<Map<string, string>>(new Map());
   const reactFlow = useReactFlow();
-  const { zoom, x: viewportX, y: viewportY } = useViewport();
-  const svgRef = useRef<SVGSVGElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const viewport = useViewport();
+  
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    
+    return () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    };
+  }, []);
   
   const getColorByLevel = useCallback((niveau: number, nodeId?: string): string => {
     if (nodeId && nodeColors.has(nodeId)) {
@@ -142,13 +150,14 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
     const currentTime = Date.now();
     const timeSinceLastClick = currentTime - lastClickTime;
     
-    // Si c'est le même noeud et moins de 500ms depuis le dernier clic = 2e clic
-    if (lastClickedNodeId === nodeId && timeSinceLastClick < 500) {
-      // 2e clic = afficher le menu EDIT
+    if (lastClickedNodeId === nodeId && timeSinceLastClick < 600) {
       const nodeInfo = nodesInfoMap.get(nodeId);
       if (nodeInfo) {
-        const screenX = (nodeInfo.x + nodeInfo.width / 2) * zoom + viewportX;
-        const screenY = (nodeInfo.y + nodeInfo.height) * zoom + viewportY + 10;
+        const centerX = nodeInfo.x + nodeInfo.width / 2;
+        const centerY = nodeInfo.y + nodeInfo.height;
+        
+        const screenX = centerX * viewport.zoom + viewport.x;
+        const screenY = centerY * viewport.zoom + viewport.y + 10;
         
         setContextMenu({
           nodeId: nodeId,
@@ -159,11 +168,10 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
       setLastClickedNodeId(null);
       setLastClickTime(0);
     } else {
-      // 1er clic = zoom
       if (zoomedNodeId === nodeId) {
         setZoomedNodeId(null);
         setTimeout(() => {
-          reactFlow.fitView({ duration: 500, padding: 0.15, maxZoom: 0.9 });
+          reactFlow.fitView({ duration: 500, padding: 0.1, maxZoom: 0.85 });
         }, 100);
       } else {
         setZoomedNodeId(nodeId);
@@ -186,7 +194,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
             }
           });
           
-          const padding = 50;
+          const padding = 30;
           minX -= padding;
           maxX += padding;
           minY -= padding;
@@ -199,9 +207,9 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
           
           const windowWidth = window.innerWidth;
           const windowHeight = window.innerHeight - 150;
-          const zoomX = (windowWidth * 0.9) / width;
-          const zoomY = (windowHeight * 0.9) / height;
-          const targetZoom = Math.min(zoomX, zoomY, 1.5);
+          const zoomX = (windowWidth * 0.95) / width;
+          const zoomY = (windowHeight * 0.95) / height;
+          const targetZoom = Math.min(zoomX, zoomY, 1.6);
           
           setTimeout(() => {
             reactFlow.setCenter(centerX, centerY, { zoom: targetZoom, duration: 500 });
@@ -212,9 +220,9 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
       setLastClickedNodeId(nodeId);
       setLastClickTime(currentTime);
     }
-  }, [zoomedNodeId, nodesInfoMap, reactFlow, lastClickedNodeId, lastClickTime, zoom, viewportX, viewportY]);
+  }, [zoomedNodeId, nodesInfoMap, reactFlow, lastClickedNodeId, lastClickTime, viewport]);
   
-  const handleDrawStart = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleDrawStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing) return;
     
     e.preventDefault();
@@ -223,13 +231,13 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     
-    const x = (clientX - viewportX) / zoom;
-    const y = (clientY - viewportY) / zoom;
+    const x = (clientX - viewport.x) / viewport.zoom;
+    const y = (clientY - viewport.y) / viewport.zoom;
     
     setCurrentPath([{ x, y }]);
-  };
+  }, [isDrawing, viewport]);
   
-  const handleDrawMove = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleDrawMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing || currentPath.length === 0) return;
     
     e.preventDefault();
@@ -238,13 +246,13 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     
-    const x = (clientX - viewportX) / zoom;
-    const y = (clientY - viewportY) / zoom;
+    const x = (clientX - viewport.x) / viewport.zoom;
+    const y = (clientY - viewport.y) / viewport.zoom;
     
     setCurrentPath(prev => [...prev, { x, y }]);
-  };
+  }, [isDrawing, currentPath, viewport]);
   
-  const handleDrawEnd = () => {
+  const handleDrawEnd = useCallback(() => {
     if (currentPath.length > 1) {
       const newPath: DrawingPath = {
         points: currentPath,
@@ -255,7 +263,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
       setDrawingPaths(prev => [...prev, newPath]);
     }
     setCurrentPath([]);
-  };
+  }, [currentPath, selectedDrawColor, selectedTool]);
   
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     if (!structure) return { nodes: [], edges: [] };
@@ -545,11 +553,10 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
   
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [customPositions, setCustomPositions] = useState<Map<string, {x: number, y: number}>>(new Map());
   
   useEffect(() => {
     setTimeout(() => {
-      reactFlow.fitView({ duration: 800, padding: 0.15, maxZoom: 0.9 });
+      reactFlow.fitView({ duration: 800, padding: 0.1, maxZoom: 0.85 });
     }, 500);
   }, [reactFlow]);
   
@@ -599,7 +606,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
             const b = parseInt(baseColor.slice(5, 7), 16);
             boxShadow = `0 0 0 6px rgba(${r}, ${g}, ${b}, 0.3), 0 0 0 14px rgba(${r}, ${g}, ${b}, 0.15), 0 0 0 24px rgba(${r}, ${g}, ${b}, 0.08), 0 0 0 36px rgba(${r}, ${g}, ${b}, 0.03)`;
           } else if (isParent) {
-            opacity = Math.max(0.3, Math.min(1, (zoom - 0.3) / 0.7));
+            opacity = Math.max(0.3, Math.min(1, (viewport.zoom - 0.3) / 0.7));
           } else if (!isDescendant) {
             opacity = 0;
           }
@@ -618,7 +625,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
         };
       })
     );
-  }, [zoomedNodeId, nodesInfoMap, setNodes, colorTheme, zoom, getColorByLevel, isDrawing]);
+  }, [zoomedNodeId, nodesInfoMap, setNodes, colorTheme, viewport.zoom, getColorByLevel, isDrawing]);
   
   const getSiblings = useCallback(() => {
     if (!zoomedNodeId) return [];
@@ -647,49 +654,21 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
     }
   };
   
-  const handleNodesChange = useCallback((changes: NodeChange[]) => {
-    changes.forEach((change) => {
-      if (change.type === 'position' && change.position && change.dragging === false) {
-        setCustomPositions(prev => {
-          const newMap = new Map(prev);
-          newMap.set(change.id, change.position!);
-          return newMap;
-        });
-        
-        setNodesInfoMap(prev => {
-          const newMap = new Map(prev);
-          const info = newMap.get(change.id);
-          if (info) {
-            info.x = change.position!.x;
-            info.y = change.position!.y;
-          }
-          return newMap;
-        });
-      }
-    });
-    onNodesChange(changes);
-  }, [onNodesChange]);
-  
-  useEffect(() => {
-    const updatedNodes = initialNodes.map(node => {
-      const customPos = customPositions.get(node.id);
-      if (customPos) {
-        return { ...node, position: customPos };
-      }
-      return node;
-    });
-    setNodes(updatedNodes);
-    setEdges(initialEdges);
-  }, [initialNodes, initialEdges, setNodes, setEdges, customPositions]);
-  
   const siblings = getSiblings();
   const currentIndex = siblings.findIndex(s => s.id === zoomedNodeId);
   
   return (
-    <div ref={containerRef} style={{ position: 'relative', height: '100%', width: '100%', overflow: 'hidden' }}>
+    <div style={{ 
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      overflow: 'hidden',
+      touchAction: isDrawing ? 'none' : 'auto'
+    }}>
       {isDrawing && (
         <svg
-          ref={svgRef}
           style={{
             position: 'absolute',
             top: 0,
@@ -699,6 +678,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
             pointerEvents: 'auto',
             zIndex: 1000,
             cursor: 'crosshair',
+            touchAction: 'none'
           }}
           onMouseDown={handleDrawStart}
           onMouseMove={handleDrawMove}
@@ -711,7 +691,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
           {drawingPaths.map((path, index) => (
             <path
               key={index}
-              d={`M ${path.points.map(p => `${p.x * zoom + viewportX},${p.y * zoom + viewportY}`).join(' L ')}`}
+              d={`M ${path.points.map(p => `${p.x * viewport.zoom + viewport.x},${p.y * viewport.zoom + viewport.y}`).join(' L ')}`}
               stroke={path.color}
               strokeWidth={path.width}
               fill="none"
@@ -722,7 +702,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
           ))}
           {currentPath.length > 0 && (
             <path
-              d={`M ${currentPath.map(p => `${p.x * zoom + viewportX},${p.y * zoom + viewportY}`).join(' L ')}`}
+              d={`M ${currentPath.map(p => `${p.x * viewport.zoom + viewport.x},${p.y * viewport.zoom + viewport.y}`).join(' L ')}`}
               stroke={selectedDrawColor}
               strokeWidth={selectedTool === 'highlighter' ? 20 : selectedTool === 'pencil' ? 2 : 3}
               fill="none"
@@ -1051,7 +1031,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
                     newMap.set(contextMenu.nodeId, note);
                     return newMap;
                   });
-                  alert('Note ajoutée ! (Fonctionnalité sous-case à implémenter)');
+                  alert('Note ajoutée !');
                 }
                 setContextMenu(null);
               }}
@@ -1127,7 +1107,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
             onClick={() => {
               setZoomedNodeId(null);
               setTimeout(() => {
-                reactFlow.fitView({ duration: 500, padding: 0.15, maxZoom: 0.9 });
+                reactFlow.fitView({ duration: 500, padding: 0.1, maxZoom: 0.85 });
               }, 100);
             }}
             style={{
@@ -1161,7 +1141,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={handleNodesChange}
+          onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
           fitView={false}
@@ -1174,6 +1154,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
           zoomOnScroll={!isDrawing}
           zoomOnPinch={!isDrawing}
           panOnDrag={!isDrawing}
+          preventScrolling={true}
         >
           <Background color="#f3f4f6" gap={20} size={1} />
           <Controls />
