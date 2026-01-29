@@ -1,5 +1,5 @@
 import React, { useState, createContext, useContext } from 'react';
-import { Upload, Brain, Menu, Globe, X, FileText, Trash2, Check, Link as LinkIcon } from 'lucide-react';
+import { Upload, Brain, Menu, Globe, X, FileText, Trash2, Check, Link as LinkIcon, FolderOpen, Plus, BarChart3, Settings } from 'lucide-react';
 import { aiService } from './services/ai.service';
 import MindMap from './components/MindMap';
 
@@ -16,7 +16,11 @@ const LanguageContext = createContext<{
 const translations = {
   fr: {
     appName: 'StudyCards',
+    tagline: 'Apprendre intelligemment',
+    myProjects: 'Mes Projets',
     newProject: 'Nouveau Projet',
+    statistics: 'Statistiques',
+    settings: 'Paramètres',
     cancel: 'Annuler',
     language: 'Langue',
     uploadFiles: 'Uploader des fichiers',
@@ -38,7 +42,11 @@ const translations = {
   },
   en: {
     appName: 'StudyCards',
+    tagline: 'Learn Smarter',
+    myProjects: 'My Projects',
     newProject: 'New Project',
+    statistics: 'Statistics',
+    settings: 'Settings',
     cancel: 'Cancel',
     language: 'Language',
     uploadFiles: 'Upload files',
@@ -163,6 +171,70 @@ async function extraireTexteURL(url: string): Promise<string> {
     return `Contenu du lien : ${url}`;
   }
 }
+
+const Sidebar = ({ activeView, setActiveView, isOpen, setIsOpen }: any) => {
+  const { t } = useLanguage();
+  const menuItems = [
+    { id: 'projets', label: t('myProjects'), icon: FolderOpen },
+    { id: 'nouveau', label: t('newProject'), icon: Plus },
+    { id: 'statistiques', label: t('statistics'), icon: BarChart3 },
+    { id: 'parametres', label: t('settings'), icon: Settings },
+  ];
+
+  return (
+    <>
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+      
+      <div className={`
+        fixed inset-y-0 left-0 z-50
+        w-64 bg-gradient-to-b from-indigo-900 to-purple-900 text-white p-6 flex flex-col
+        transform transition-transform duration-300 ease-in-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Brain className="w-8 h-8" />
+              {t('appName')}
+            </h1>
+            <p className="text-indigo-200 text-sm mt-1">{t('tagline')}</p>
+          </div>
+          <button 
+            onClick={() => setIsOpen(false)}
+            className="text-white hover:bg-white/10 p-2 rounded-lg"
+          >
+            <X size={24} />
+          </button>
+        </div>
+        
+        <nav className="flex-1">
+          {menuItems.map(item => (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActiveView(item.id);
+                setIsOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition-all ${
+                activeView === item.id 
+                  ? 'bg-white/20 shadow-lg' 
+                  : 'hover:bg-white/10'
+              }`}
+            >
+              <item.icon className="w-5 h-5" />
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+    </>
+  );
+};
 
 const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
   const { t } = useLanguage();
@@ -434,12 +506,110 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
   );
 };
 
-const MindMapView = ({ projetActif, activeTab, setActiveTab }: any) => {
-  const { t } = useLanguage();
+const MindMapView = ({ projetActif, activeTab, setActiveTab, menuOpen, setMenuOpen }: any) => {
+  const { t, lang, setLang } = useLanguage();
   const [mode, setMode] = useState<'full' | 'semi' | 'light'>('semi');
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '12px 20px',
+        background: 'white',
+        borderBottom: '1px solid #e5e7eb',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '12px'
+        }}>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '8px'
+            }}
+          >
+            <Menu size={24} style={{ color: '#6b7280' }} />
+          </button>
+          
+          <h1 style={{
+            fontSize: '18px',
+            fontWeight: 'bold',
+            color: '#1f2937',
+            flex: 1,
+            textAlign: 'center'
+          }}>
+            {projetActif ? projetActif.titre : t('newProject')}
+          </h1>
+          
+          <button
+            onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '8px'
+            }}
+          >
+            <Globe size={24} style={{ color: '#6b7280' }} />
+          </button>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+          <button
+            onClick={() => setMode('light')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              background: mode === 'light' ? '#6366f1' : '#e5e7eb',
+              color: mode === 'light' ? 'white' : '#4b5563',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            {t('lightMode')}
+          </button>
+          <button
+            onClick={() => setMode('semi')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              background: mode === 'semi' ? '#6366f1' : '#e5e7eb',
+              color: mode === 'semi' ? 'white' : '#4b5563',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            {t('semiMode')}
+          </button>
+          <button
+            onClick={() => setMode('full')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              background: mode === 'full' ? '#6366f1' : '#e5e7eb',
+              color: mode === 'full' ? 'white' : '#4b5563',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            {t('fullMode')}
+          </button>
+        </div>
+      </div>
+      
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         {activeTab === 'mindmap' && projetActif?.structure && (
           <MindMap structure={projetActif.structure} mode={mode} />
@@ -486,13 +656,13 @@ const MindMapView = ({ projetActif, activeTab, setActiveTab }: any) => {
         boxShadow: '0 -2px 8px rgba(0,0,0,0.05)'
       }}>
         <button
-          onClick={() => setActiveTab('mindmap')}
+          onClick={() => setActiveTab('synthesis')}
           style={{
             flex: 1,
             padding: '16px',
             border: 'none',
-            background: activeTab === 'mindmap' ? '#6366f1' : 'white',
-            color: activeTab === 'mindmap' ? 'white' : '#6b7280',
+            background: activeTab === 'synthesis' ? '#6366f1' : 'white',
+            color: activeTab === 'synthesis' ? 'white' : '#6b7280',
             fontSize: '14px',
             fontWeight: '600',
             cursor: 'pointer',
@@ -551,106 +721,26 @@ function App() {
 
   return (
     <LanguageContext.Provider value={{ lang, setLang, t }}>
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f9fafb' }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '12px 20px',
-          background: 'white',
-          borderBottom: '1px solid #e5e7eb',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-        }}>
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '8px'
-            }}
-          >
-            <Menu size={24} style={{ color: '#6b7280' }} />
-          </button>
-          
-          <h1 style={{
-            fontSize: '18px',
-            fontWeight: 'bold',
-            color: '#1f2937',
-            flex: 1,
-            textAlign: 'center'
-          }}>
-            {projetActif ? projetActif.titre : t('newProject')}
-          </h1>
-          
-          <button
-            onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '8px'
-            }}
-          >
-            <Globe size={24} style={{ color: '#6b7280' }} />
-          </button>
-        </div>
-        
-        {menuOpen && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 100
-          }} onClick={() => setMenuOpen(false)}>
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              bottom: 0,
-              width: '280px',
-              background: 'white',
-              boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
-              padding: '20px'
-            }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ marginBottom: '30px' }}>
-                <h2 style={{ fontSize: '20px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Brain size={24} style={{ color: '#6366f1' }} />
-                  StudyCards
-                </h2>
-              </div>
-              <button
-                onClick={() => {
-                  setActiveView('nouveau');
-                  setProjetActif(null);
-                  setMenuOpen(false);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  background: '#6366f1',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: '600'
-                }}
-              >
-                + {t('newProject')}
-              </button>
-            </div>
-          </div>
-        )}
+      <div style={{ height: '100vh', overflow: 'hidden', background: '#f9fafb' }}>
+        <Sidebar 
+          activeView={activeView} 
+          setActiveView={setActiveView} 
+          isOpen={menuOpen} 
+          setIsOpen={setMenuOpen} 
+        />
         
         {activeView === 'nouveau' && (
           <NouveauProjet setActiveView={setActiveView} setProjetActif={setProjetActif} />
         )}
         
         {activeView === 'mindmap' && projetActif && (
-          <MindMapView projetActif={projetActif} activeTab={activeTab} setActiveTab={setActiveTab} />
+          <MindMapView 
+            projetActif={projetActif} 
+            activeTab={activeTab} 
+            setActiveTab={setActiveTab}
+            menuOpen={menuOpen}
+            setMenuOpen={setMenuOpen}
+          />
         )}
       </div>
     </LanguageContext.Provider>
