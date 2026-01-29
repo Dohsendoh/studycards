@@ -1,5 +1,5 @@
 import React, { useState, createContext, useContext } from 'react';
-import { Upload, FolderOpen, Brain, BarChart3, Settings, Plus, FileText, Trash2, Check, X, Globe, Menu, Link as LinkIcon } from 'lucide-react';
+import { Upload, Brain, Menu, Globe, X, FileText, Trash2, Check, Link as LinkIcon } from 'lucide-react';
 import { aiService } from './services/ai.service';
 import MindMap from './components/MindMap';
 
@@ -16,22 +16,14 @@ const LanguageContext = createContext<{
 const translations = {
   fr: {
     appName: 'StudyCards',
-    tagline: 'Apprendre intelligemment',
-    myProjects: 'Mes Projets',
     newProject: 'Nouveau Projet',
-    statistics: 'Statistiques',
-    settings: 'Paramètres',
-    organizeStudy: 'Organisez et révisez vos cours',
-    all: 'Tous',
-    cards: 'cards',
-    progression: 'Progression',
-    launchAI: 'Lancer l\'analyse IA',
-    analyzing: 'Analyse en cours...',
     cancel: 'Annuler',
     language: 'Langue',
     uploadFiles: 'Uploader des fichiers',
     addLink: 'Ajouter un lien',
     projectName: 'Nom du projet',
+    launchAI: 'Lancer l\'analyse IA',
+    analyzing: 'Analyse en cours...',
     analyzing1: 'Extraction des documents...',
     analyzing2: 'Analyse Gemini en cours...',
     analyzing3: 'Analyse Mistral en cours...',
@@ -41,26 +33,19 @@ const translations = {
     semiMode: 'Résumé',
     lightMode: 'Léger',
     memoryCards: 'Memory Cards',
-    backToMap: 'Retour à la carte'
+    synthesis: 'Synthèse',
+    quiz: 'Quizz',
   },
   en: {
     appName: 'StudyCards',
-    tagline: 'Learn Smarter',
-    myProjects: 'My Projects',
     newProject: 'New Project',
-    statistics: 'Statistics',
-    settings: 'Settings',
-    organizeStudy: 'Organize and review',
-    all: 'All',
-    cards: 'cards',
-    progression: 'Progress',
-    launchAI: 'Launch AI Analysis',
-    analyzing: 'Analyzing...',
     cancel: 'Cancel',
     language: 'Language',
     uploadFiles: 'Upload files',
     addLink: 'Add link',
     projectName: 'Project name',
+    launchAI: 'Launch AI Analysis',
+    analyzing: 'Analyzing...',
     analyzing1: 'Extracting documents...',
     analyzing2: 'Gemini analysis...',
     analyzing3: 'Mistral analysis...',
@@ -70,7 +55,8 @@ const translations = {
     semiMode: 'Summary',
     lightMode: 'Light',
     memoryCards: 'Memory Cards',
-    backToMap: 'Back to map'
+    synthesis: 'Synthesis',
+    quiz: 'Quiz',
   }
 };
 
@@ -79,11 +65,6 @@ const useLanguage = () => useContext(LanguageContext);
 interface Projet {
   id: string;
   titre: string;
-  dossier: string;
-  dateCreation: Date;
-  nombreCards: number;
-  progression: number;
-  couleur: string;
   structure?: any;
   memoryCards?: any[];
 }
@@ -183,97 +164,6 @@ async function extraireTexteURL(url: string): Promise<string> {
   }
 }
 
-const Sidebar = ({ activeView, setActiveView, isOpen, setIsOpen }: any) => {
-  const { t } = useLanguage();
-  const menuItems = [
-    { id: 'projets', label: t('myProjects'), icon: FolderOpen },
-    { id: 'nouveau', label: t('newProject'), icon: Plus },
-    { id: 'statistiques', label: t('statistics'), icon: BarChart3 },
-    { id: 'parametres', label: t('settings'), icon: Settings },
-  ];
-
-  return (
-    <>
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
-      
-      <div className={`
-        fixed lg:static inset-y-0 left-0 z-50
-        w-64 bg-gradient-to-b from-indigo-900 to-purple-900 text-white p-6 flex flex-col
-        transform transition-transform duration-300 ease-in-out
-        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Brain className="w-8 h-8" />
-              {t('appName')}
-            </h1>
-            <p className="text-indigo-200 text-sm mt-1">{t('tagline')}</p>
-          </div>
-          <button 
-            onClick={() => setIsOpen(false)}
-            className="lg:hidden text-white hover:bg-white/10 p-2 rounded-lg"
-          >
-            <X size={24} />
-          </button>
-        </div>
-        
-        <nav className="flex-1">
-          {menuItems.map(item => (
-            <button
-              key={item.id}
-              onClick={() => {
-                setActiveView(item.id);
-                setIsOpen(false);
-              }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition-all ${
-                activeView === item.id 
-                  ? 'bg-white/20 shadow-lg' 
-                  : 'hover:bg-white/10'
-              }`}
-            >
-              <item.icon className="w-5 h-5" />
-              {item.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-    </>
-  );
-};
-
-const AccueilProjets = ({ setActiveView, setProjetActif }: any) => {
-  const { t } = useLanguage();
-
-  return (
-    <div className="p-4 lg:p-8">
-      <div className="mb-6 lg:mb-8">
-        <h2 className="text-2xl lg:text-3xl font-bold text-gray-800 mb-2">{t('myProjects')}</h2>
-        <p className="text-sm lg:text-base text-gray-600">{t('organizeStudy')}</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-        <div
-          onClick={() => setActiveView('nouveau')}
-          className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border-2 border-dashed border-indigo-300 hover:border-indigo-500 transition-all cursor-pointer flex items-center justify-center min-h-[200px]"
-        >
-          <div className="text-center p-4">
-            <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Plus className="w-6 h-6 text-indigo-600" />
-            </div>
-            <h3 className="text-base font-semibold text-gray-700">{t('newProject')}</h3>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
   const { t } = useLanguage();
   const [etape, setEtape] = useState(1);
@@ -351,11 +241,6 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
       const nouveauProjet: Projet = {
         id: Date.now().toString(),
         titre: nomProjet,
-        dossier: 'Mes projets',
-        dateCreation: new Date(),
-        nombreCards: cards.length,
-        progression: 0,
-        couleur: 'bg-blue-500',
         structure,
         memoryCards: cards
       };
@@ -374,181 +259,279 @@ const NouveauProjet = ({ setActiveView, setProjetActif }: any) => {
   };
 
   return (
-    <div className="p-4 lg:p-8 max-w-4xl mx-auto">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">{t('newProject')}</h2>
-      </div>
-
-      {etape === 1 && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <input
-              type="text"
-              value={nomProjet}
-              onChange={(e) => setNomProjet(e.target.value)}
-              placeholder={t('projectName')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
-            />
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+        {etape === 1 && (
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>{t('newProject')}</h2>
             
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".pdf,image/*"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-indigo-400 flex flex-col items-center"
-              >
-                <Upload className="w-8 h-8 mb-2 text-gray-400" />
-                <span className="text-sm">{t('uploadFiles')}</span>
-              </button>
+            <div style={{ background: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+              <input
+                type="text"
+                value={nomProjet}
+                onChange={(e) => setNomProjet(e.target.value)}
+                placeholder={t('projectName')}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  marginBottom: '16px'
+                }}
+              />
               
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-                <LinkIcon className="w-8 h-8 mb-2 text-gray-400 mx-auto" />
-                <input
-                  type="url"
-                  value={lienURL}
-                  onChange={(e) => setLienURL(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full text-sm px-2 py-1 border rounded mb-2"
-                />
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,image/*"
+                onChange={handleFileUpload}
+                style={{ display: 'none' }}
+              />
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <button
-                  onClick={ajouterLien}
-                  className="w-full text-sm bg-indigo-600 text-white py-1 rounded"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    border: '2px dashed #d1d5db',
+                    borderRadius: '8px',
+                    padding: '24px',
+                    cursor: 'pointer',
+                    background: 'white',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center'
+                  }}
                 >
-                  {t('addLink')}
+                  <Upload size={32} style={{ marginBottom: '8px', color: '#9ca3af' }} />
+                  <span style={{ fontSize: '14px' }}>{t('uploadFiles')}</span>
                 </button>
+                
+                <div style={{ border: '2px dashed #d1d5db', borderRadius: '8px', padding: '16px' }}>
+                  <LinkIcon size={32} style={{ marginBottom: '8px', color: '#9ca3af', margin: '0 auto', display: 'block' }} />
+                  <input
+                    type="url"
+                    value={lienURL}
+                    onChange={(e) => setLienURL(e.target.value)}
+                    placeholder="https://..."
+                    style={{
+                      width: '100%',
+                      fontSize: '14px',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      marginBottom: '8px'
+                    }}
+                  />
+                  <button
+                    onClick={ajouterLien}
+                    style={{
+                      width: '100%',
+                      fontSize: '14px',
+                      background: '#6366f1',
+                      color: 'white',
+                      padding: '8px',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {t('addLink')}
+                  </button>
+                </div>
               </div>
+
+              {documents.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {documents.map(doc => (
+                    <div key={doc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: '#f9fafb', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                        {doc.type === 'link' ? <LinkIcon size={20} style={{ color: '#3b82f6', flexShrink: 0 }} /> : <FileText size={20} style={{ color: '#ef4444', flexShrink: 0 }} />}
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontWeight: '500', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.nom}</div>
+                          {doc.taille && <div style={{ fontSize: '12px', color: '#6b7280' }}>{doc.taille}</div>}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => supprimerDocument(doc.id)}
+                        style={{ color: '#ef4444', padding: '8px', flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer' }}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {documents.length > 0 && (
-              <div className="space-y-2">
-                {documents.map(doc => (
-                  <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      {doc.type === 'link' ? <LinkIcon className="text-blue-500 flex-shrink-0" size={20} /> : <FileText className="text-red-500 flex-shrink-0" size={20} />}
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium text-sm truncate">{doc.nom}</div>
-                        {doc.taille && <div className="text-xs text-gray-500">{doc.taille}</div>}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => supprimerDocument(doc.id)}
-                      className="text-red-500 p-2 flex-shrink-0"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  padding: '12px 24px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  background: 'white',
+                  cursor: 'pointer'
+                }}
+              >
+                {t('cancel')}
+              </button>
+              <button
+                onClick={lancerAnalyse}
+                disabled={!nomProjet || documents.length === 0}
+                style={{
+                  padding: '12px 24px',
+                  background: (!nomProjet || documents.length === 0) ? '#d1d5db' : '#6366f1',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: (!nomProjet || documents.length === 0) ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Brain size={20} />
+                {t('launchAI')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {etape === 2 && (
+          <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', padding: '48px', textAlign: 'center', maxWidth: '600px', margin: '100px auto' }}>
+            <div style={{ width: '80px', height: '80px', background: '#e0e7ff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+              <Brain size={40} style={{ color: '#6366f1', animation: 'pulse 2s infinite' }} />
+            </div>
+            <h3 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '12px' }}>{t('analyzing')}</h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '400px', margin: '0 auto', textAlign: 'left' }}>
+              {[1, 2, 3, 4].map(num => (
+                <div key={num} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: etapeAnalyse > num ? '#22c55e' : etapeAnalyse === num ? '#6366f1' : 'transparent',
+                    border: etapeAnalyse <= num ? '2px solid #d1d5db' : 'none'
+                  }}>
+                    {etapeAnalyse > num && <Check size={16} style={{ color: 'white' }} />}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-between">
-            <button
-              onClick={() => setActiveView('projets')}
-              className="px-6 py-3 border rounded-lg"
-            >
-              {t('cancel')}
-            </button>
-            <button
-              onClick={lancerAnalyse}
-              disabled={!nomProjet || documents.length === 0}
-              className="px-6 py-3 bg-indigo-600 text-white rounded-lg flex items-center gap-2 disabled:bg-gray-300"
-            >
-              <Brain size={20} />
-              {t('launchAI')}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {etape === 2 && (
-        <div className="bg-white rounded-xl shadow-md p-12 text-center">
-          <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
-            <Brain className="w-10 h-10 text-indigo-600" />
-          </div>
-          <h3 className="text-2xl font-bold mb-3">{t('analyzing')}</h3>
-          
-          <div className="space-y-3 max-w-md mx-auto text-left">
-            {[1, 2, 3, 4].map(num => (
-              <div key={num} className="flex items-center gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                  etapeAnalyse > num ? 'bg-green-500' : etapeAnalyse === num ? 'bg-indigo-500 animate-spin' : 'border-2 border-gray-300'
-                }`}>
-                  {etapeAnalyse > num && <Check size={16} className="text-white" />}
+                  <span style={{ fontWeight: etapeAnalyse >= num ? '500' : 'normal', color: etapeAnalyse >= num ? '#1f2937' : '#6b7280' }}>
+                    {t(`analyzing${num}` as any)}
+                  </span>
                 </div>
-                <span className={etapeAnalyse >= num ? 'font-medium' : 'text-gray-500'}>
-                  {t(`analyzing${num}` as any)}
-                </span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
 
-const MindMapView = ({ projetActif, setActiveView }: any) => {
+const MindMapView = ({ projetActif, activeTab, setActiveTab }: any) => {
   const { t } = useLanguage();
   const [mode, setMode] = useState<'full' | 'semi' | 'light'>('semi');
 
   return (
-    <div className="p-4 lg:p-8 h-full flex flex-col">
-      <div className="mb-4">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">{projetActif?.titre}</h2>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        {activeTab === 'mindmap' && projetActif?.structure && (
+          <MindMap structure={projetActif.structure} mode={mode} />
+        )}
         
-        <div className="flex gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('viewMode')}</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setMode('light')}
-                className={`px-4 py-2 rounded-lg text-sm ${mode === 'light' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}
-              >
-                {t('lightMode')}
-              </button>
-              <button
-                onClick={() => setMode('semi')}
-                className={`px-4 py-2 rounded-lg text-sm ${mode === 'semi' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}
-              >
-                {t('semiMode')}
-              </button>
-              <button
-                onClick={() => setMode('full')}
-                className={`px-4 py-2 rounded-lg text-sm ${mode === 'full' ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}
-              >
-                {t('fullMode')}
-              </button>
-            </div>
+        {activeTab === 'synthesis' && (
+          <div style={{ padding: '40px', textAlign: 'center' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Synthèse</h2>
+            <p style={{ color: '#6b7280' }}>À implémenter</p>
           </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-md flex-1" style={{ minHeight: '600px' }}>
-        {projetActif?.structure && (
-          <MindMap 
-            structure={projetActif.structure} 
-            mode={mode}
-          />
+        )}
+        
+        {activeTab === 'quiz' && (
+          <div style={{ padding: '40px', textAlign: 'center' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Quizz</h2>
+            <p style={{ color: '#6b7280' }}>À implémenter</p>
+          </div>
+        )}
+        
+        {activeTab === 'memory' && (
+          <div style={{ padding: '40px', overflow: 'auto', height: '100%' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px' }}>Memory Cards</h2>
+            {projetActif?.memoryCards && projetActif.memoryCards.length > 0 ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                {projetActif.memoryCards.map((card: MemoryCard) => (
+                  <div key={card.id} style={{ background: 'white', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{card.theme}</div>
+                    <div style={{ fontWeight: 'bold', marginBottom: '12px' }}>{card.question}</div>
+                    <div style={{ fontSize: '14px', color: '#4b5563' }}>{card.reponse}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ color: '#6b7280', textAlign: 'center' }}>Aucune memory card disponible</p>
+            )}
+          </div>
         )}
       </div>
       
-      <div className="mt-4 flex justify-between">
+      <div style={{
+        display: 'flex',
+        borderTop: '1px solid #e5e7eb',
+        background: 'white',
+        boxShadow: '0 -2px 8px rgba(0,0,0,0.05)'
+      }}>
         <button
-          onClick={() => setActiveView('projets')}
-          className="px-6 py-3 border rounded-lg"
+          onClick={() => setActiveTab('mindmap')}
+          style={{
+            flex: 1,
+            padding: '16px',
+            border: 'none',
+            background: activeTab === 'mindmap' ? '#6366f1' : 'white',
+            color: activeTab === 'mindmap' ? 'white' : '#6b7280',
+            fontSize: '14px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
         >
-          {t('backToMap')}
+          {t('synthesis')}
         </button>
         <button
-          className="px-6 py-3 bg-green-600 text-white rounded-lg"
+          onClick={() => setActiveTab('quiz')}
+          style={{
+            flex: 1,
+            padding: '16px',
+            border: 'none',
+            borderLeft: '1px solid #e5e7eb',
+            borderRight: '1px solid #e5e7eb',
+            background: activeTab === 'quiz' ? '#6366f1' : 'white',
+            color: activeTab === 'quiz' ? 'white' : '#6b7280',
+            fontSize: '14px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          {t('quiz')}
+        </button>
+        <button
+          onClick={() => setActiveTab('memory')}
+          style={{
+            flex: 1,
+            padding: '16px',
+            border: 'none',
+            background: activeTab === 'memory' ? '#6366f1' : 'white',
+            color: activeTab === 'memory' ? 'white' : '#6b7280',
+            fontSize: '14px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
         >
           {t('memoryCards')}
         </button>
@@ -559,52 +542,116 @@ const MindMapView = ({ projetActif, setActiveView }: any) => {
 
 function App() {
   const [lang, setLang] = useState('fr');
-  const [activeView, setActiveView] = useState('projets');
+  const [activeView, setActiveView] = useState('nouveau');
   const [projetActif, setProjetActif] = useState<Projet | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('mindmap');
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  const t = (key: string) => translations[lang as keyof typeof translations][key as keyof typeof translations['fr']] || key;
+  const t = (key: string) => translations[lang as keyof typeof translations][key as keyof typeof translations.fr] || key;
 
   return (
     <LanguageContext.Provider value={{ lang, setLang, t }}>
-      <div className="flex h-screen bg-gray-50">
-        <Sidebar 
-          activeView={activeView} 
-          setActiveView={setActiveView}
-          isOpen={sidebarOpen}
-          setIsOpen={setSidebarOpen}
-        />
-        
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <header className="bg-white border-b border-gray-200 px-4 lg:px-8 py-4 flex items-center justify-between">
-            <button 
-              onClick={() => setSidebarOpen(true)}
-              className="lg:hidden text-gray-600"
-            >
-              <Menu size={24} />
-            </button>
-            <div className="flex-1"></div>
-            <button 
-              onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100"
-            >
-              <Globe size={20} />
-              <span className="hidden sm:inline">{lang === 'fr' ? 'FR' : 'EN'}</span>
-            </button>
-          </header>
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f9fafb' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '12px 20px',
+          background: 'white',
+          borderBottom: '1px solid #e5e7eb',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+        }}>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '8px'
+            }}
+          >
+            <Menu size={24} style={{ color: '#6b7280' }} />
+          </button>
           
-          <main className="flex-1 overflow-auto">
-            {activeView === 'projets' && (
-              <AccueilProjets setActiveView={setActiveView} setProjetActif={setProjetActif} />
-            )}
-            {activeView === 'nouveau' && (
-              <NouveauProjet setActiveView={setActiveView} setProjetActif={setProjetActif} />
-            )}
-            {activeView === 'mindmap' && projetActif && (
-              <MindMapView projetActif={projetActif} setActiveView={setActiveView} />
-            )}
-          </main>
+          <h1 style={{
+            fontSize: '18px',
+            fontWeight: 'bold',
+            color: '#1f2937',
+            flex: 1,
+            textAlign: 'center'
+          }}>
+            {projetActif ? projetActif.titre : t('newProject')}
+          </h1>
+          
+          <button
+            onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '8px'
+            }}
+          >
+            <Globe size={24} style={{ color: '#6b7280' }} />
+          </button>
         </div>
+        
+        {menuOpen && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 100
+          }} onClick={() => setMenuOpen(false)}>
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              bottom: 0,
+              width: '280px',
+              background: 'white',
+              boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
+              padding: '20px'
+            }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ marginBottom: '30px' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Brain size={24} style={{ color: '#6366f1' }} />
+                  StudyCards
+                </h2>
+              </div>
+              <button
+                onClick={() => {
+                  setActiveView('nouveau');
+                  setProjetActif(null);
+                  setMenuOpen(false);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: '#6366f1',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                + {t('newProject')}
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {activeView === 'nouveau' && (
+          <NouveauProjet setActiveView={setActiveView} setProjetActif={setProjetActif} />
+        )}
+        
+        {activeView === 'mindmap' && projetActif && (
+          <MindMapView projetActif={projetActif} activeTab={activeTab} setActiveTab={setActiveTab} />
+        )}
       </div>
     </LanguageContext.Provider>
   );
