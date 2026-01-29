@@ -4,17 +4,15 @@ import ReactFlow, {
   Edge,
   Background,
   Controls,
-  MiniMap,
   useNodesState,
   useEdgesState,
   Position,
-  NodeChange,
   useReactFlow,
   ReactFlowProvider,
   useViewport,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Pencil } from 'lucide-react';
+import { Pencil, Eraser } from 'lucide-react';
 
 interface MindMapProps {
   structure: any;
@@ -57,12 +55,18 @@ interface DrawingPath {
   tool: 'pen' | 'pencil' | 'highlighter';
 }
 
+interface SubNote {
+  id: string;
+  parentId: string;
+  text: string;
+}
+
 const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
   const [colorTheme, setColorTheme] = useState<keyof typeof COLOR_THEMES>('indigo');
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showDrawMenu, setShowDrawMenu] = useState(false);
   const [showDrawColors, setShowDrawColors] = useState(false);
-  const [selectedTool, setSelectedTool] = useState<'pen' | 'pencil' | 'highlighter'>('pen');
+  const [selectedTool, setSelectedTool] = useState<'pen' | 'pencil' | 'highlighter' | 'eraser'>('pen');
   const [selectedDrawColor, setSelectedDrawColor] = useState('#000000');
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawingPaths, setDrawingPaths] = useState<DrawingPath[]>([]);
@@ -73,7 +77,9 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
   const [nodesInfoMap, setNodesInfoMap] = useState<Map<string, NodeInfo>>(new Map());
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const [nodeColors, setNodeColors] = useState<Map<string, string>>(new Map());
-  const [nodeNotes, setNodeNotes] = useState<Map<string, string>>(new Map());
+  const [nodeTexts, setNodeTexts] = useState<Map<string, string>>(new Map());
+  const [subNotes, setSubNotes] = useState<SubNote[]>([]);
+  const [showColorPickerForNode, setShowColorPickerForNode] = useState(false);
   const reactFlow = useReactFlow();
   const viewport = useViewport();
   
@@ -98,28 +104,28 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
   const getSizeByLevel = useCallback((niveau: number, currentMode: string) => {
     const sizes = {
       light: [
-        { width: 200, height: 90 },
-        { width: 180, height: 85 },
-        { width: 160, height: 80 },
-        { width: 140, height: 75 },
-        { width: 120, height: 70 },
-        { width: 100, height: 65 },
+        { width: 200, height: 70 },
+        { width: 180, height: 65 },
+        { width: 160, height: 60 },
+        { width: 140, height: 55 },
+        { width: 120, height: 50 },
+        { width: 100, height: 45 },
       ],
       semi: [
-        { width: 280, height: 130 },
-        { width: 240, height: 120 },
-        { width: 200, height: 110 },
-        { width: 170, height: 100 },
-        { width: 140, height: 90 },
-        { width: 120, height: 85 },
+        { width: 280, height: 110 },
+        { width: 240, height: 100 },
+        { width: 200, height: 90 },
+        { width: 170, height: 85 },
+        { width: 140, height: 75 },
+        { width: 120, height: 70 },
       ],
       full: [
-        { width: 350, height: 160 },
-        { width: 300, height: 150 },
-        { width: 260, height: 140 },
-        { width: 220, height: 130 },
-        { width: 180, height: 120 },
-        { width: 160, height: 110 },
+        { width: 350, height: 140 },
+        { width: 300, height: 130 },
+        { width: 260, height: 120 },
+        { width: 220, height: 110 },
+        { width: 180, height: 100 },
+        { width: 160, height: 90 },
       ],
     };
     
@@ -149,41 +155,46 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
   const handleNodeClickInternal = useCallback((nodeId: string) => {
     const currentTime = Date.now();
     const timeSinceLastClick = currentTime - lastClickTime;
+    const nodeInfo = nodesInfoMap.get(nodeId);
+    
+    if (!nodeInfo) return;
+    
+    const isThemeOrIntro = nodeInfo.niveau === 0 || nodeInfo.titre.toLowerCase().includes('introduction');
     
     if (lastClickedNodeId === nodeId && timeSinceLastClick < 600) {
-      const nodeInfo = nodesInfoMap.get(nodeId);
-      if (nodeInfo) {
-        const centerX = nodeInfo.x + nodeInfo.width / 2;
-        const centerY = nodeInfo.y + nodeInfo.height;
-        
-        const screenX = centerX * viewport.zoom + viewport.x;
-        const screenY = centerY * viewport.zoom + viewport.y + 10;
-        
-        setContextMenu({
-          nodeId: nodeId,
-          x: screenX,
-          y: screenY
-        });
-      }
+      const centerX = nodeInfo.x + nodeInfo.width / 2;
+      const centerY = nodeInfo.y + nodeInfo.height;
+      
+      const screenX = centerX * viewport.zoom + viewport.x;
+      const screenY = centerY * viewport.zoom + viewport.y + 10;
+      
+      setContextMenu({
+        nodeId: nodeId,
+        x: screenX,
+        y: screenY
+      });
       setLastClickedNodeId(null);
       setLastClickTime(0);
     } else {
       if (zoomedNodeId === nodeId) {
-        setZoomedNodeId(null);
-        setTimeout(() => {
-          reactFlow.fitView({ duration: 500, padding: 0.1, maxZoom: 0.85 });
-        }, 100);
+        if (nodeInfo.parentId) {
+          handleNodeClickInternal(nodeInfo.parentId);
+        } else {
+          setZoomedNodeId(null);
+          setTimeout(() => {
+            reactFlow.fitView({ duration: 500, padding: 0.1, maxZoom: 0.85 });
+          }, 100);
+        }
       } else {
         setZoomedNodeId(nodeId);
         
-        const info = nodesInfoMap.get(nodeId);
-        if (info) {
-          const allDescendants = info.allDescendantsIds;
-          let minX = info.x;
-          let maxX = info.x + info.width;
-          let minY = info.y;
-          let maxY = info.y + info.height;
-          
+        let minX = nodeInfo.x;
+        let maxX = nodeInfo.x + nodeInfo.width;
+        let minY = nodeInfo.y;
+        let maxY = nodeInfo.y + nodeInfo.height;
+        
+        if (!isThemeOrIntro) {
+          const allDescendants = nodeInfo.allDescendantsIds;
           allDescendants.forEach(descId => {
             const descInfo = nodesInfoMap.get(descId);
             if (descInfo) {
@@ -193,28 +204,28 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
               maxY = Math.max(maxY, descInfo.y + descInfo.height);
             }
           });
-          
-          const padding = 30;
-          minX -= padding;
-          maxX += padding;
-          minY -= padding;
-          maxY += padding;
-          
-          const centerX = (minX + maxX) / 2;
-          const centerY = (minY + maxY) / 2;
-          const width = maxX - minX;
-          const height = maxY - minY;
-          
-          const windowWidth = window.innerWidth;
-          const windowHeight = window.innerHeight - 150;
-          const zoomX = (windowWidth * 0.95) / width;
-          const zoomY = (windowHeight * 0.95) / height;
-          const targetZoom = Math.min(zoomX, zoomY, 1.6);
-          
-          setTimeout(() => {
-            reactFlow.setCenter(centerX, centerY, { zoom: targetZoom, duration: 500 });
-          }, 100);
         }
+        
+        const padding = 30;
+        minX -= padding;
+        maxX += padding;
+        minY -= padding;
+        maxY += padding;
+        
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const width = maxX - minX;
+        const height = maxY - minY;
+        
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight - 200;
+        const zoomX = (windowWidth * 0.95) / width;
+        const zoomY = (windowHeight * 0.95) / height;
+        const targetZoom = Math.min(zoomX, zoomY, 1.6);
+        
+        setTimeout(() => {
+          reactFlow.setCenter(centerX, centerY, { zoom: targetZoom, duration: 500 });
+        }, 100);
       }
       
       setLastClickedNodeId(nodeId);
@@ -234,11 +245,22 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
     const x = (clientX - viewport.x) / viewport.zoom;
     const y = (clientY - viewport.y) / viewport.zoom;
     
-    setCurrentPath([{ x, y }]);
-  }, [isDrawing, viewport]);
+    if (selectedTool === 'eraser') {
+      const eraserRadius = 20;
+      setDrawingPaths(prev => prev.filter(path => {
+        return !path.points.some(point => {
+          const dx = (point.x * viewport.zoom + viewport.x) - clientX;
+          const dy = (point.y * viewport.zoom + viewport.y) - clientY;
+          return Math.sqrt(dx * dx + dy * dy) < eraserRadius;
+        });
+      }));
+    } else {
+      setCurrentPath([{ x, y }]);
+    }
+  }, [isDrawing, viewport, selectedTool]);
   
   const handleDrawMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing || currentPath.length === 0) return;
+    if (!isDrawing) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -249,16 +271,27 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
     const x = (clientX - viewport.x) / viewport.zoom;
     const y = (clientY - viewport.y) / viewport.zoom;
     
-    setCurrentPath(prev => [...prev, { x, y }]);
-  }, [isDrawing, currentPath, viewport]);
+    if (selectedTool === 'eraser') {
+      const eraserRadius = 20;
+      setDrawingPaths(prev => prev.filter(path => {
+        return !path.points.some(point => {
+          const dx = (point.x * viewport.zoom + viewport.x) - clientX;
+          const dy = (point.y * viewport.zoom + viewport.y) - clientY;
+          return Math.sqrt(dx * dx + dy * dy) < eraserRadius;
+        });
+      }));
+    } else if (currentPath.length > 0) {
+      setCurrentPath(prev => [...prev, { x, y }]);
+    }
+  }, [isDrawing, currentPath, viewport, selectedTool]);
   
   const handleDrawEnd = useCallback(() => {
-    if (currentPath.length > 1) {
+    if (currentPath.length > 1 && selectedTool !== 'eraser') {
       const newPath: DrawingPath = {
         points: currentPath,
         color: selectedDrawColor,
         width: selectedTool === 'highlighter' ? 20 : selectedTool === 'pencil' ? 2 : 3,
-        tool: selectedTool
+        tool: selectedTool as 'pen' | 'pencil' | 'highlighter'
       };
       setDrawingPaths(prev => [...prev, newPath]);
     }
@@ -312,14 +345,17 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
         allDescendantsIds: []
       });
       
+      const customText = nodeTexts.get(currentId);
+      const displayTitle = customText || noeud.titre;
+      
       let contentToShow = '';
       let maxChars = 0;
       
       if (mode === 'semi') {
-        maxChars = niveau === 0 ? 120 : niveau === 1 ? 100 : 80;
+        maxChars = niveau === 0 ? 100 : niveau === 1 ? 80 : 60;
         contentToShow = noeud.contenu?.substring(0, maxChars) || '';
       } else if (mode === 'full') {
-        maxChars = niveau === 0 ? 200 : niveau === 1 ? 180 : niveau === 2 ? 150 : 120;
+        maxChars = niveau === 0 ? 180 : niveau === 1 ? 150 : niveau === 2 ? 120 : 100;
         contentToShow = noeud.contenu?.substring(0, maxChars) || '';
       }
       
@@ -327,8 +363,8 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
         contentToShow += '...';
       }
       
-      const titleSize = niveau === 0 ? '16px' : niveau === 1 ? '15px' : niveau === 2 ? '14px' : '13px';
-      const contentSize = niveau === 0 ? '12px' : niveau === 1 ? '11px' : '10px';
+      const titleSize = niveau === 0 ? '15px' : niveau === 1 ? '14px' : niveau === 2 ? '13px' : '12px';
+      const contentSize = niveau === 0 ? '11px' : niveau === 1 ? '10px' : '9px';
       
       nodes.push({
         id: currentId,
@@ -345,14 +381,14 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              padding: niveau === 0 ? '16px' : niveau === 1 ? '14px' : '12px',
+              padding: niveau === 0 ? '12px' : niveau === 1 ? '10px' : '8px',
               boxSizing: 'border-box',
               cursor: 'pointer',
             }}>
               <div style={{ 
                 fontWeight: niveau <= 2 ? 'bold' : '600',
                 fontSize: titleSize,
-                marginBottom: contentToShow ? '6px' : '0',
+                marginBottom: contentToShow ? '4px' : '0',
                 width: '100%',
                 textAlign: 'center',
                 overflow: 'hidden',
@@ -361,18 +397,18 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
                 WebkitLineClamp: 2,
                 WebkitBoxOrient: 'vertical',
               }}>
-                {noeud.titre}
+                {displayTitle}
               </div>
               {contentToShow && (
                 <div style={{ 
                   fontSize: contentSize,
                   color: niveau === 0 ? '#e0e7ff' : '#4b5563',
-                  lineHeight: '1.3',
+                  lineHeight: '1.2',
                   width: '100%',
                   textAlign: 'center',
                   overflow: 'hidden',
                   display: '-webkit-box',
-                  WebkitLineClamp: mode === 'semi' ? 3 : 5,
+                  WebkitLineClamp: mode === 'semi' ? 2 : mode === 'full' ? 4 : 0,
                   WebkitBoxOrient: 'vertical',
                 }}>
                   {contentToShow}
@@ -387,7 +423,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
           color: niveau === 0 ? 'white' : '#1f2937',
           border: `3px solid ${COLOR_THEMES[colorTheme][0]}`,
           borderRadius: niveau === 0 ? '12px' : niveau === 1 ? '10px' : '8px',
-          fontSize: '13px',
+          fontSize: '12px',
           boxShadow: niveau === 0 
             ? '0 6px 12px rgba(0,0,0,0.15)' 
             : niveau === 1 
@@ -398,6 +434,54 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
           padding: 0,
         },
         draggable: false,
+      });
+      
+      const nodeNotes = subNotes.filter(note => note.parentId === currentId);
+      nodeNotes.forEach((note, index) => {
+        const noteId = `note-${currentId}-${index}`;
+        const noteY = y + nodeHeight + 10;
+        const noteX = x;
+        
+        nodes.push({
+          id: noteId,
+          type: 'default',
+          position: { x: noteX, y: noteY },
+          data: {
+            label: (
+              <div style={{
+                padding: '6px 10px',
+                fontSize: '11px',
+                fontStyle: 'italic',
+                color: '#6b7280',
+                background: '#fef3c7',
+                borderRadius: '6px',
+                maxWidth: '200px',
+              }}>
+                📝 {note.text}
+              </div>
+            )
+          },
+          style: {
+            background: '#fef3c7',
+            border: '1px dashed #f59e0b',
+            borderRadius: '6px',
+            padding: 0,
+          },
+          draggable: false,
+        });
+        
+        edges.push({
+          id: `edge-note-${currentId}-${noteId}`,
+          source: currentId,
+          target: noteId,
+          type: 'straight',
+          animated: false,
+          style: { 
+            stroke: '#f59e0b', 
+            strokeWidth: 1,
+            strokeDasharray: '5,5'
+          },
+        });
       });
       
       return currentId;
@@ -549,7 +633,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
     setNodesInfoMap(infoMap);
     
     return { nodes, edges };
-  }, [structure, mode, colorTheme, getColorByLevel, getSizeByLevel, getAllDescendants]);
+  }, [structure, mode, colorTheme, getColorByLevel, getSizeByLevel, getAllDescendants, nodeTexts, subNotes]);
   
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -659,7 +743,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
   
   return (
     <div style={{ 
-      position: 'fixed',
+      position: 'absolute',
       top: 0,
       left: 0,
       right: 0,
@@ -677,7 +761,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
             height: '100%',
             pointerEvents: 'auto',
             zIndex: 1000,
-            cursor: 'crosshair',
+            cursor: selectedTool === 'eraser' ? 'crosshair' : 'crosshair',
             touchAction: 'none'
           }}
           onMouseDown={handleDrawStart}
@@ -700,7 +784,7 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
               opacity={path.tool === 'highlighter' ? 0.4 : 1}
             />
           ))}
-          {currentPath.length > 0 && (
+          {currentPath.length > 0 && selectedTool !== 'eraser' && (
             <path
               d={`M ${currentPath.map(p => `${p.x * viewport.zoom + viewport.x},${p.y * viewport.zoom + viewport.y}`).join(' L ')}`}
               stroke={selectedDrawColor}
@@ -713,25 +797,6 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
           )}
         </svg>
       )}
-      
-      <div style={{ 
-        position: 'absolute', 
-        top: '10px', 
-        left: '10px', 
-        zIndex: 100,
-      }}>
-        <MiniMap 
-          nodeColor={(node) => node.style?.background as string || '#6366f1'}
-          maskColor="rgba(0, 0, 0, 0.1)"
-          style={{
-            background: 'white',
-            border: '2px solid #e5e7eb',
-            borderRadius: '8px',
-            width: '120px',
-            height: '80px'
-          }}
-        />
-      </div>
       
       <div style={{ 
         position: 'absolute', 
@@ -825,8 +890,25 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
             >
               🖍️ Surligneur
             </button>
+            <button
+              onClick={() => {
+                setSelectedTool('eraser');
+                setIsDrawing(true);
+                setShowDrawColors(false);
+              }}
+              style={{
+                padding: '8px 12px',
+                border: selectedTool === 'eraser' ? '2px solid #6366f1' : '1px solid #e5e7eb',
+                borderRadius: '6px',
+                background: selectedTool === 'eraser' ? '#e0e7ff' : 'white',
+                cursor: 'pointer',
+                textAlign: 'left'
+              }}
+            >
+              🧹 Gomme
+            </button>
             
-            {showDrawColors && (
+            {showDrawColors && selectedTool !== 'eraser' && (
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(4, 1fr)',
@@ -958,7 +1040,10 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
               inset: 0,
               zIndex: 999
             }}
-            onClick={() => setContextMenu(null)}
+            onClick={() => {
+              setContextMenu(null);
+              setShowColorPickerForNode(false);
+            }}
           />
           <div style={{
             position: 'fixed',
@@ -966,42 +1051,22 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
             left: contextMenu.x,
             transform: 'translateX(-50%)',
             background: 'white',
-            borderRadius: '8px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-            padding: '8px',
+            borderRadius: '12px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+            padding: '12px',
             zIndex: 1000,
-            minWidth: '200px'
+            minWidth: '220px',
+            border: '2px solid #6366f1'
           }}>
             <button
               onClick={() => {
-                const newText = prompt('Nouveau texte:');
-                if (newText) {
-                  alert('Modification du texte: ' + newText);
-                }
-                setContextMenu(null);
-              }}
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: 'none',
-                background: 'transparent',
-                textAlign: 'left',
-                cursor: 'pointer',
-                borderRadius: '4px',
-                fontSize: '14px'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-            >
-              ✏️ Modifier le texte
-            </button>
-            <button
-              onClick={() => {
-                const color = prompt('Couleur (hex):');
-                if (color) {
-                  setNodeColors(prev => {
+                const nodeInfo = nodesInfoMap.get(contextMenu.nodeId);
+                const currentText = nodeTexts.get(contextMenu.nodeId) || nodeInfo?.titre || '';
+                const newText = prompt('Modifier le texte:', currentText);
+                if (newText !== null && newText.trim() !== '') {
+                  setNodeTexts(prev => {
                     const newMap = new Map(prev);
-                    newMap.set(contextMenu.nodeId, color);
+                    newMap.set(contextMenu.nodeId, newText);
                     return newMap;
                   });
                 }
@@ -1009,66 +1074,141 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
               }}
               style={{
                 width: '100%',
-                padding: '10px',
+                padding: '12px',
                 border: 'none',
                 background: 'transparent',
                 textAlign: 'left',
                 cursor: 'pointer',
-                borderRadius: '4px',
-                fontSize: '14px'
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
               }}
               onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
-              🎨 Changer la couleur
+              <span style={{ fontSize: '18px' }}>✏️</span>
+              <span>Modifier le texte</span>
             </button>
+            <button
+              onClick={() => setShowColorPickerForNode(!showColorPickerForNode)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: 'none',
+                background: 'transparent',
+                textAlign: 'left',
+                cursor: 'pointer',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            >
+              <span style={{ fontSize: '18px' }}>🎨</span>
+              <span>Changer la couleur</span>
+            </button>
+            
+            {showColorPickerForNode && (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '8px',
+                padding: '8px',
+                marginTop: '8px',
+                borderTop: '1px solid #e5e7eb'
+              }}>
+                {DRAW_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => {
+                      setNodeColors(prev => {
+                        const newMap = new Map(prev);
+                        newMap.set(contextMenu.nodeId, color);
+                        return newMap;
+                      });
+                      setContextMenu(null);
+                      setShowColorPickerForNode(false);
+                    }}
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '6px',
+                      border: '2px solid #e5e7eb',
+                      background: color,
+                      cursor: 'pointer',
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+            
             <button
               onClick={() => {
                 const note = prompt('Ajouter une note:');
-                if (note) {
-                  setNodeNotes(prev => {
-                    const newMap = new Map(prev);
-                    newMap.set(contextMenu.nodeId, note);
-                    return newMap;
-                  });
-                  alert('Note ajoutée !');
+                if (note && note.trim()) {
+                  const newNote: SubNote = {
+                    id: `note-${Date.now()}`,
+                    parentId: contextMenu.nodeId,
+                    text: note
+                  };
+                  setSubNotes(prev => [...prev, newNote]);
                 }
                 setContextMenu(null);
               }}
               style={{
                 width: '100%',
-                padding: '10px',
+                padding: '12px',
                 border: 'none',
                 background: 'transparent',
                 textAlign: 'left',
                 cursor: 'pointer',
-                borderRadius: '4px',
-                fontSize: '14px'
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
               }}
               onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
-              📝 Ajouter une note
+              <span style={{ fontSize: '18px' }}>📝</span>
+              <span>Ajouter une note</span>
             </button>
             <button
-              onClick={() => setContextMenu(null)}
+              onClick={() => {
+                setContextMenu(null);
+                setShowColorPickerForNode(false);
+              }}
               style={{
                 width: '100%',
-                padding: '10px',
+                padding: '12px',
                 border: 'none',
                 background: 'transparent',
                 textAlign: 'left',
                 cursor: 'pointer',
-                borderRadius: '4px',
+                borderRadius: '6px',
                 fontSize: '14px',
+                fontWeight: '500',
                 color: '#dc2626',
                 marginTop: '4px',
-                borderTop: '1px solid #e5e7eb'
+                borderTop: '1px solid #e5e7eb',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
               }}
               onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
-              ❌ Annuler
+              <span style={{ fontSize: '18px' }}>❌</span>
+              <span>Annuler</span>
             </button>
           </div>
         </>
@@ -1084,10 +1224,11 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
           display: 'flex',
           gap: '8px',
           background: 'white',
-          padding: '6px 10px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          fontSize: '13px'
+          padding: '8px 12px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          fontSize: '13px',
+          border: '2px solid #e5e7eb'
         }}>
           <button
             onClick={navigateToPrevious}
@@ -1096,9 +1237,11 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
               background: 'transparent',
               border: 'none',
               cursor: currentIndex === 0 ? 'not-allowed' : 'pointer',
-              padding: '4px 8px',
+              padding: '6px 12px',
               fontSize: '13px',
-              opacity: currentIndex === 0 ? 0.4 : 1
+              fontWeight: '600',
+              opacity: currentIndex === 0 ? 0.4 : 1,
+              borderRadius: '6px'
             }}
           >
             ← Précédent
@@ -1114,8 +1257,9 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              padding: '4px 8px',
-              fontSize: '16px'
+              padding: '6px 12px',
+              fontSize: '18px',
+              borderRadius: '6px'
             }}
           >
             🏠
@@ -1127,9 +1271,11 @@ const MindMapContent: React.FC<MindMapProps> = ({ structure, mode }) => {
               background: 'transparent',
               border: 'none',
               cursor: currentIndex === siblings.length - 1 ? 'not-allowed' : 'pointer',
-              padding: '4px 8px',
+              padding: '6px 12px',
               fontSize: '13px',
-              opacity: currentIndex === siblings.length - 1 ? 0.4 : 1
+              fontWeight: '600',
+              opacity: currentIndex === siblings.length - 1 ? 0.4 : 1,
+              borderRadius: '6px'
             }}
           >
             Suivant →
